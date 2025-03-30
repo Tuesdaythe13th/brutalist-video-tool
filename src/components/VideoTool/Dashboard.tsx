@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
 import { PersonaConfig } from "./PersonaConfig";
+import { DatasetGenerator } from "./DatasetGenerator";
 
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,8 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <PersonaConfig />
+      
+      <DatasetGenerator />
     </div>
   );
 };
