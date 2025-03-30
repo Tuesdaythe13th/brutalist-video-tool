@@ -7,6 +7,7 @@ import { DatasetGenerator } from "./DatasetGenerator";
 import { ConversationSystem } from "./ConversationSystem";
 import { EthicalProcessor } from "./EthicalProcessor";
 import { WeatherAPIExplorer } from "./WeatherAPIExplorer";
+import { PersonaAPI } from "./PersonaAPI";
 
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -71,6 +72,8 @@ export const Dashboard: React.FC = () => {
       <EthicalProcessor />
       
       <WeatherAPIExplorer />
+      
+      <PersonaAPI />
     </div>
   );
 };
