@@ -1,13 +1,19 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { useConversation } from "@11labs/react";
+import { supabase } from "@/lib/supabaseClient";
 
 interface ElevenLabsWidgetProps {
   ethicalScore: number;
   weatherState: string;
 }
+
+// Table name for storing API keys
+const API_KEYS_TABLE = "user_api_keys";
+const API_KEY_TYPE = "elevenlabs";
 
 export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({ 
   ethicalScore, 
@@ -61,23 +67,77 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   });
   
-  // Auto-initialize widget if API key exists in storage
-  useEffect(() => {
-    // Try to get API key from localStorage first
-    let storedKey = localStorage.getItem("elevenlabs_api_key");
-    
-    // If not in localStorage, try to get from sessionStorage (helpful for development/testing)
-    if (!storedKey) {
-      storedKey = sessionStorage.getItem("elevenlabs_api_key");
-    }
-    
-    if (storedKey) {
-      console.log("Found stored API key, initializing widget automatically");
-      setApiKey(storedKey);
-      setShowApiKeyInput(false);
+  // Fetch API key from Supabase
+  const fetchApiKeyFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from(API_KEYS_TABLE)
+        .select('api_key')
+        .eq('key_type', API_KEY_TYPE)
+        .single();
       
-      // Auto-initialize the widget with the stored key
-      const autoInitialize = async () => {
+      if (error) {
+        console.log('No API key found in Supabase:', error.message);
+        return null;
+      }
+      
+      return data?.api_key || null;
+    } catch (error) {
+      console.error('Error fetching API key from Supabase:', error);
+      return null;
+    }
+  };
+
+  // Store API key in Supabase
+  const storeApiKeyInSupabase = async (key: string) => {
+    try {
+      const { error } = await supabase
+        .from(API_KEYS_TABLE)
+        .upsert({ 
+          key_type: API_KEY_TYPE,
+          api_key: key
+        }, { 
+          onConflict: 'key_type' 
+        });
+      
+      if (error) {
+        console.error('Error storing API key in Supabase:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error storing API key in Supabase:', error);
+      return false;
+    }
+  };
+  
+  // Auto-initialize widget if API key exists
+  useEffect(() => {
+    const initializeWithStoredKey = async () => {
+      // Try to get API key from Supabase first
+      let storedKey = await fetchApiKeyFromSupabase();
+      
+      // If not in Supabase, try localStorage and sessionStorage as fallbacks
+      if (!storedKey) {
+        storedKey = localStorage.getItem("elevenlabs_api_key") || sessionStorage.getItem("elevenlabs_api_key");
+        
+        // If we found a key in local/session storage, store it in Supabase too for future use
+        if (storedKey) {
+          await storeApiKeyInSupabase(storedKey);
+        }
+      } else {
+        // Store key in localStorage for backward compatibility
+        localStorage.setItem("elevenlabs_api_key", storedKey);
+        sessionStorage.setItem("elevenlabs_api_key", storedKey);
+      }
+      
+      if (storedKey) {
+        console.log("Found stored API key, initializing widget automatically");
+        setApiKey(storedKey);
+        setShowApiKeyInput(false);
+        
+        // Auto-initialize the widget with the stored key
         try {
           await conversation.startSession({
             agentId: "5xmHawj3HdrruGcviH3Y",
@@ -94,12 +154,12 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
             variant: "destructive",
           });
         }
-      };
-      
-      autoInitialize();
-    } else {
-      setIsLoading(false);
-    }
+      } else {
+        setIsLoading(false);
+      }
+    };
+    
+    initializeWithStoredKey();
   }, []);
 
   // Update conversation when ethicalScore or weatherState change
@@ -122,13 +182,17 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
 
     try {
       setIsLoading(true);
-      // Store API key in both localStorage and sessionStorage for redundancy
+      
+      // Store API key in Supabase
+      await storeApiKeyInSupabase(apiKey);
+      
+      // Also store in local storage for backward compatibility
       localStorage.setItem("elevenlabs_api_key", apiKey);
       sessionStorage.setItem("elevenlabs_api_key", apiKey);
       
       setShowApiKeyInput(false);
       
-      // Start the conversation session with correct parameter structure
+      // Start the conversation session
       await conversation.startSession({
         agentId: "5xmHawj3HdrruGcviH3Y",
         authorization: apiKey
@@ -160,14 +224,31 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   };
 
-  const clearSavedKey = () => {
-    localStorage.removeItem("elevenlabs_api_key");
-    sessionStorage.removeItem("elevenlabs_api_key");
-    setApiKey("");
-    toast({
-      title: "API Key Removed",
-      description: "Your saved API key has been removed from browser storage.",
-    });
+  const clearSavedKey = async () => {
+    try {
+      // Remove from Supabase
+      await supabase
+        .from(API_KEYS_TABLE)
+        .delete()
+        .eq('key_type', API_KEY_TYPE);
+      
+      // Also remove from local storage
+      localStorage.removeItem("elevenlabs_api_key");
+      sessionStorage.removeItem("elevenlabs_api_key");
+      
+      setApiKey("");
+      toast({
+        title: "API Key Removed",
+        description: "Your saved API key has been removed from all storage locations.",
+      });
+    } catch (error) {
+      console.error("Error clearing API key:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove API key from database.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -234,7 +315,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
               </Button>
             </div>
             <p className="mt-4 text-xs text-gray-500">
-              Your API key will be stored in your browser's local storage. You can get a key from <a href="https://elevenlabs.io/app" target="_blank" rel="noopener noreferrer" className="underline">ElevenLabs</a>.
+              Your API key will be stored securely in the database for future sessions. You can get a key from <a href="https://elevenlabs.io/app" target="_blank" rel="noopener noreferrer" className="underline">ElevenLabs</a>.
             </p>
           </div>
         ) : (
