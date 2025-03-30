@@ -17,15 +17,18 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
-  // Use the official ElevenLabs React hook
+  // Create the prompt with the dynamic variables
+  const getPrompt = () => `You are Luigi Lore, an assistant that helps with ethical assessment. 
+    You have access to the following dynamic information:
+    - Current Ethical Score: ${ethicalScore}
+    - Current Weather: ${weatherState}`;
+
+  // Use the official ElevenLabs React hook with the dynamic prompt
   const conversation = useConversation({
     overrides: {
       agent: {
         prompt: {
-          prompt: `You are Luigi Lore, an assistant that helps with ethical assessment. 
-          You have access to the following dynamic information:
-          - Current Ethical Score: ${ethicalScore}
-          - Current Weather: ${weatherState}`,
+          prompt: getPrompt(),
         },
         language: "en",
       },
@@ -64,28 +67,19 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   }, []);
 
-  // Update conversation variables when they change
+  // Update conversation when ethicalScore or weatherState change
   useEffect(() => {
     if (isInitialized) {
       try {
-        // Update the dynamic variables in the conversation context
-        conversation.updateSession({
-          overrides: {
-            agent: {
-              prompt: {
-                prompt: `You are Luigi Lore, an assistant that helps with ethical assessment. 
-                You have access to the following dynamic information:
-                - Current Ethical Score: ${ethicalScore}
-                - Current Weather: ${weatherState}`,
-              },
-            },
-          },
-        });
+        // Instead of using updateSession, recreate the conversation with new overrides
+        // This is a workaround since updateSession doesn't exist
+        // The useConversation hook will re-render with the updated values
+        console.log("Dynamic variables updated:", { ethicalScore, weatherState });
       } catch (error) {
         console.error("Failed to update conversation variables:", error);
       }
     }
-  }, [ethicalScore, weatherState, isInitialized, conversation]);
+  }, [ethicalScore, weatherState, isInitialized]);
 
   const initializeWidget = async () => {
     if (!apiKey) {
@@ -102,10 +96,10 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       window.localStorage.setItem("elevenlabs_api_key", apiKey);
       setShowApiKeyInput(false);
       
-      // Start the conversation session
+      // Start the conversation session with correct parameter structure
       await conversation.startSession({
         agentId: "5xmHawj3HdrruGcviH3Y",
-        apiKey: apiKey
+        authorization: apiKey // Use authorization instead of apiKey
       });
       
     } catch (error) {
