@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
 import { PersonaConfig } from "./PersonaConfig";
 import { DatasetGenerator } from "./DatasetGenerator";
+import { ConversationSystem } from "./ConversationSystem";
 
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -62,6 +63,8 @@ export const Dashboard: React.FC = () => {
       <PersonaConfig />
       
       <DatasetGenerator />
+
+      <ConversationSystem />
     </div>
   );
 };
