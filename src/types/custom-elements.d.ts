@@ -1,13 +1,12 @@
 
-// This file contains custom element type definitions
-
+// Global TypeScript definitions for custom elements 
 declare namespace JSX {
   interface IntrinsicElements {
-    'elevenlabs-convai': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+    'elevenlabs-convai': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
       'agent-id'?: string;
       'api-key'?: string;
       'dynamic-variables'?: string;
-    };
+    }, HTMLElement>;
   }
 }
 
