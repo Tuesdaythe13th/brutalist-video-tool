@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
+import { PersonaConfig } from "./PersonaConfig";
 
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -56,6 +57,8 @@ export const Dashboard: React.FC = () => {
           evalData={evalData}
         />
       </div>
+
+      <PersonaConfig />
     </div>
   );
 };
