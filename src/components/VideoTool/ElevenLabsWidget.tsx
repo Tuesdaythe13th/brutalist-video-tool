@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { useConversation } from "@11labs/react";
 
 interface ElevenLabsWidgetProps {
   ethicalScore: number;
@@ -14,7 +15,45 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
 }) => {
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
-  const [isWidgetInitialized, setIsWidgetInitialized] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  
+  // Use the official ElevenLabs React hook
+  const conversation = useConversation({
+    overrides: {
+      agent: {
+        prompt: {
+          prompt: `You are Luigi Lore, an assistant that helps with ethical assessment. 
+          You have access to the following dynamic information:
+          - Current Ethical Score: ${ethicalScore}
+          - Current Weather: ${weatherState}`,
+        },
+        language: "en",
+      },
+    },
+    onConnect: () => {
+      toast({
+        title: "ElevenLabs Connected",
+        description: "Voice assistant connected successfully!",
+      });
+      setIsInitialized(true);
+    },
+    onDisconnect: () => {
+      setIsInitialized(false);
+      toast({
+        title: "ElevenLabs Disconnected",
+        description: "Voice assistant connection ended.",
+      });
+    },
+    onError: (error) => {
+      console.error("ElevenLabs error:", error);
+      toast({
+        title: "Connection Error",
+        description: "There was an error with the voice assistant.",
+        variant: "destructive",
+      });
+      setIsInitialized(false);
+    }
+  });
   
   // Check for stored API key on component mount
   useEffect(() => {
@@ -25,62 +64,30 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   }, []);
 
-  // Handle widget initialization when API key is provided
+  // Update conversation variables when they change
   useEffect(() => {
-    if (!showApiKeyInput && apiKey && !isWidgetInitialized) {
+    if (isInitialized) {
       try {
-        // Initialize the widget using the global Window.ElevenLabsWidget object
-        if (window.ElevenLabsWidget) {
-          window.ElevenLabsWidget.init({
-            apiKey: apiKey,
-            agentId: "5xmHawj3HdrruGcviH3Y",
-            dynamicVariables: {
-              current_ethical_score: ethicalScore.toString(),
-              current_weather_state: weatherState
-            }
-          });
-          
-          setIsWidgetInitialized(true);
-          
-          toast({
-            title: "ElevenLabs Widget Initialized",
-            description: "Luigi Lore widget is now ready!",
-          });
-        } else {
-          console.error("ElevenLabsWidget is not available on window object");
-          toast({
-            title: "Widget Initialization Failed",
-            description: "ElevenLabs widget script hasn't loaded yet. Please try again in a moment.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Error initializing ElevenLabs widget:", error);
-        toast({
-          title: "Widget Initialization Failed",
-          description: "There was an error initializing the ElevenLabs widget.",
-          variant: "destructive",
-        });
-        setIsWidgetInitialized(false);
-      }
-    }
-  }, [showApiKeyInput, apiKey, isWidgetInitialized, ethicalScore, weatherState]);
-
-  // Update dynamic variables when they change
-  useEffect(() => {
-    if (isWidgetInitialized && window.ElevenLabsWidget) {
-      try {
-        window.ElevenLabsWidget.updateDynamicVariables({
-          current_ethical_score: ethicalScore.toString(),
-          current_weather_state: weatherState
+        // Update the dynamic variables in the conversation context
+        conversation.updateSession({
+          overrides: {
+            agent: {
+              prompt: {
+                prompt: `You are Luigi Lore, an assistant that helps with ethical assessment. 
+                You have access to the following dynamic information:
+                - Current Ethical Score: ${ethicalScore}
+                - Current Weather: ${weatherState}`,
+              },
+            },
+          },
         });
       } catch (error) {
-        console.error("Failed to update widget dynamic variables:", error);
+        console.error("Failed to update conversation variables:", error);
       }
     }
-  }, [ethicalScore, weatherState, isWidgetInitialized]);
+  }, [ethicalScore, weatherState, isInitialized, conversation]);
 
-  const initializeWidget = () => {
+  const initializeWidget = async () => {
     if (!apiKey) {
       toast({
         title: "API Key Required",
@@ -94,6 +101,13 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       // Store API key in localStorage
       window.localStorage.setItem("elevenlabs_api_key", apiKey);
       setShowApiKeyInput(false);
+      
+      // Start the conversation session
+      await conversation.startSession({
+        agentId: "5xmHawj3HdrruGcviH3Y",
+        apiKey: apiKey
+      });
+      
     } catch (error) {
       console.error("Failed to initialize widget:", error);
       toast({
@@ -104,17 +118,15 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   };
 
-  const removeWidget = () => {
+  const removeWidget = async () => {
     try {
-      if (window.ElevenLabsWidget) {
-        window.ElevenLabsWidget.destroy();
-      }
-      setIsWidgetInitialized(false);
+      await conversation.endSession();
+      setIsInitialized(false);
       setShowApiKeyInput(true);
       localStorage.removeItem("elevenlabs_api_key");
       toast({
         title: "Widget Removed",
-        description: "ElevenLabs widget has been removed.",
+        description: "ElevenLabs voice assistant has been removed.",
       });
     } catch (error) {
       console.error("Error removing widget:", error);
@@ -128,7 +140,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           LUIGI LORE VOICE INTERFACE
         </h2>
         <div className="flex items-center gap-2">
-          {isWidgetInitialized ? (
+          {isInitialized ? (
             <div className="flex items-center">
               <div className="bg-green-500 h-3 w-3 rounded-full mr-2"></div>
               <span className="text-sm font-bold">WIDGET ACTIVE</span>
@@ -162,7 +174,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
                 onClick={initializeWidget}
                 className="brutalist-btn"
               >
-                Initialize Widget
+                Initialize Voice Assistant
               </Button>
             </div>
             <p className="mt-4 text-xs text-gray-500">
@@ -171,15 +183,30 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           </div>
         ) : (
           <div className="flex flex-col items-center">
-            <p className="mb-4">
-              Luigi Lore widget is now active! You should see the widget button in the corner of your screen.
-            </p>
-            <Button 
-              onClick={removeWidget}
-              className="bg-red-500 hover:bg-red-600 text-white"
-            >
-              Remove Widget
-            </Button>
+            <div className="text-center mb-4">
+              <p className="mb-2">
+                Luigi Lore voice assistant is {isInitialized ? "active" : "initializing"}!
+              </p>
+              {isInitialized ? (
+                <p className="text-sm text-green-600 font-bold">Try talking to Luigi Lore now!</p>
+              ) : (
+                <p className="text-sm text-amber-600">Please wait while the assistant initializes...</p>
+              )}
+            </div>
+            <div className="flex gap-4 items-center">
+              {conversation.isSpeaking && (
+                <div className="flex items-center">
+                  <div className="animate-pulse bg-blue-500 h-3 w-3 rounded-full mr-2"></div>
+                  <span className="text-sm">Speaking...</span>
+                </div>
+              )}
+              <Button 
+                onClick={removeWidget}
+                className="bg-red-500 hover:bg-red-600 text-white"
+              >
+                Remove Voice Assistant
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -192,17 +219,13 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         </ul>
       </div>
 
-      {/* Add the direct elevenlabs-convai element to the DOM for direct widget initialization */}
-      {!showApiKeyInput && apiKey && (
-        <div style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
-          <elevenlabs-convai 
-            agent-id="5xmHawj3HdrruGcviH3Y"
-            api-key={apiKey}
-            dynamic-variables={JSON.stringify({
-              current_ethical_score: ethicalScore.toString(),
-              current_weather_state: weatherState
-            })}
-          />
+      {/* Status indicator */}
+      {!showApiKeyInput && (
+        <div className="mt-4 p-2 border border-black">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-xs">STATUS:</span>
+            <span className="text-xs">{conversation.status}</span>
+          </div>
         </div>
       )}
     </div>
