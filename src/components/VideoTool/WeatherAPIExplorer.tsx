@@ -1,362 +1,214 @@
-
 import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { getWeatherForLocation } from "@/lib/supabase";
+import { toast } from "@/components/ui/use-toast";
 
-export const WeatherAPIExplorer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("usageTab");
-  const [isCopied, setIsCopied] = useState<boolean>(false);
-  const [apiKey, setApiKey] = useState<string>("");
-  const [location, setLocation] = useState<string>("New York,US");
-  const [testResult, setTestResult] = useState<string>("");
-  const [errorMessage, setErrorMessage] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+interface WeatherAPIExplorerProps {
+  onWeatherUpdate?: (location: string) => Promise<string | null>;
+}
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(pythonCode);
-    setIsCopied(true);
-    setTimeout(() => {
-      setIsCopied(false);
-    }, 2000);
-  };
+export const WeatherAPIExplorer: React.FC<WeatherAPIExplorerProps> = ({ onWeatherUpdate }) => {
+  const [location, setLocation] = useState("New York");
+  const [weatherCondition, setWeatherCondition] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleTestFunction = () => {
-    if (!apiKey.trim()) {
-      setErrorMessage("Please enter an API key");
-      return;
-    }
-
-    if (!location.trim()) {
-      setErrorMessage("Please enter a location");
-      return;
-    }
-
+  const handleGetWeather = async () => {
     setIsLoading(true);
-    setErrorMessage("");
 
-    // Simulate API call with delay
-    setTimeout(() => {
-      try {
-        // Mock responses based on location
-        const mockResponses: Record<string, string[]> = {
-          "New York": ["Clear ☀️", "Cloudy ☁️", "Rain 🌧️"],
-          "London": ["Cloudy ☁️", "Drizzle 🌦️", "Rain 🌧️"],
-          "Tokyo": ["Clear ☀️", "Rain 🌧️", "Partly Cloudy ⛅"],
-          "Sydney": ["Clear ☀️", "Windy 🌬️", "Thunderstorm ⚡"],
-          "default": ["Clear ☀️", "Cloudy ☁️", "Windy 🌬️"],
-        };
-
-        // Find matching location or use default
-        let locationKey = location.split(",")[0];
-        let conditions =
-          mockResponses[locationKey] || mockResponses.default;
-
-        // Get random condition
-        const condition =
-          conditions[Math.floor(Math.random() * conditions.length)];
-
-        // Display result
-        setTestResult(
-          `<strong>Weather in ${location}:</strong> <span class="weather-result">${condition}</span>`
-        );
-      } catch (error) {
-        setTestResult("Error occurred during test");
-        setErrorMessage(
-          "Note: This is a simulated test. The real API call would be made using Python."
-        );
-      } finally {
-        setIsLoading(false);
+    try {
+      let condition;
+      
+      if (onWeatherUpdate) {
+        // Use the callback from props if provided
+        condition = await onWeatherUpdate(location);
+      } else {
+        // Otherwise use direct function call
+        condition = await getWeatherForLocation(location);
       }
-    }, 1500);
-  };
-
-  const openTab = (tabId: string) => {
-    setActiveTab(tabId);
+      
+      setWeatherCondition(condition || "Unknown");
+      
+      toast({
+        title: "Weather Updated",
+        description: `Current condition in ${location}: ${condition}`,
+      });
+    } catch (error) {
+      console.error("Failed to fetch weather data:", error);
+      toast({
+        title: "Weather Update Failed",
+        description: "Could not retrieve weather data. Check console for details.",
+        variant: "destructive"
+      });
+      setWeatherCondition("Error fetching data");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const pythonCode = `import requests
+import json
+from datetime import datetime, timedelta
 
-def get_simplified_weather(api_key, location):
-    """
-    Get simplified weather description from OpenWeatherMap API.
+class WeatherAPIClient:
+    """Client for accessing weather data and caching results in Supabase."""
     
-    Args:
-        api_key (str): OpenWeatherMap API key
-        location (str): City name or "City,Country"
-    
-    Returns:
-        str: Simplified weather condition (e.g., 'Clear', 'Rain', 'Clouds')
+    def __init__(self, supabase_client):
+        """
+        Initialize the weather API client.
         
-    Raises:
-        ValueError: If API request fails or invalid data received
-        requests.exceptions.RequestException: If network error occurs
-    """
-    base_url = "http://api.openweathermap.org/data/2.5/weather"
-    
-    try:
-        # Make API request
-        params = {
-            'q': location,
-            'appid': api_key,
-            'units': 'metric'
-        }
-        response = requests.get(base_url, params=params)
-        response.raise_for_status()  # Raise exception for 4XX/5XX status codes
+        Args:
+            supabase_client: Initialized Supabase client
+        """
+        self.supabase = supabase_client
+        self.cache_duration = timedelta(hours=1)  # Cache weather for 1 hour
         
-        data = response.json()
+    async def get_weather(self, location):
+        """
+        Get weather for a location, using cache when available.
         
-        # Validate response structure
-        if not isinstance(data.get('weather'), list) or len(data['weather']) == 0:
-            raise ValueError("Invalid weather data format received")
+        Args:
+            location: String location name (e.g., "New York")
             
-        # Extract main weather condition
-        weather_condition = data['weather'][0]['main']
+        Returns:
+            String with weather condition and emoji
+        """
+        # Check cache first
+        cached_weather = await self._get_from_cache(location)
+        if cached_weather:
+            return cached_weather
+            
+        # If not in cache or expired, fetch from API
+        weather_data = await self._fetch_from_api(location)
         
-        # Handle some special conditions
-        if weather_condition == 'Thunderstorm':
-            return 'Thunderstorm ⚡'
-        elif 'rain' in weather_condition.lower():
-            return 'Rain 🌧️'
-        elif weather_condition == 'Drizzle':
-            return 'Drizzle 🌦️'
-        elif 'snow' in weather_condition.lower():
-            return 'Snow ❄️'
-        elif weather_condition == 'Clear':
-            return 'Clear ☀️'
-        elif weather_condition == 'Clouds':
-            # Check if it's few clouds or overcast
-            if data['weather'][0]['description'].lower() == 'few clouds':
-                return 'Partly Cloudy ⛅'
-            return 'Cloudy ☁️'
-        elif 'wind' in weather_condition.lower():
-            return 'Windy 🌬️'
-        else:
-            return weather_condition
+        # Cache the result
+        await self._update_cache(location, weather_data)
         
-    except requests.exceptions.RequestException as e:
-        raise ValueError(f"Failed to fetch weather data: {str(e)}")
-    except ValueError as e:
-        raise
-    except Exception as e:
-        raise ValueError(f"Unexpected error processing weather data: {str(e)}")`;
+        return weather_data
+        
+    async def _get_from_cache(self, location):
+        """Check if we have a recent cache entry for this location."""
+        try:
+            response = await self.supabase.table('weather_cache').select('*').eq('location', location).single()
+            
+            if response.data:
+                last_updated = datetime.fromisoformat(response.data['last_updated'])
+                if datetime.now() - last_updated < self.cache_duration:
+                    return response.data['condition']
+        except Exception as e:
+            print(f"Cache retrieval error: {e}")
+            
+        return None
+        
+    async def _update_cache(self, location, condition):
+        """Update the cache with new weather data."""
+        try:
+            await self.supabase.table('weather_cache').upsert({
+                'location': location,
+                'condition': condition,
+                'last_updated': datetime.now().isoformat()
+            })
+        except Exception as e:
+            print(f"Cache update error: {e}")
+            
+    async def _fetch_from_api(self, location):
+        """
+        Fetch weather from external API.
+        
+        In production, this would call a real weather API.
+        For this demo, we'll simulate with mock data.
+        """
+        # Simulate API delay
+        import asyncio
+        await asyncio.sleep(0.5)
+        
+        # Mock weather responses
+        mock_weather = {
+            "New York": ["Clear ☀️", "Cloudy ☁️", "Rain 🌧️"],
+            "London": ["Cloudy ☁️", "Drizzle 🌦️", "Rain 🌧️"],
+            "Tokyo": ["Clear ☀️", "Rain 🌧️", "Partly Cloudy ⛅"],
+            "Sydney": ["Clear ☀️", "Windy 🌬️", "Thunderstorm ⚡"],
+        }
+        
+        # Get location key or use default
+        location_key = location.split(',')[0]
+        conditions = mock_weather.get(location_key, ["Clear ☀️", "Cloudy ☁️", "Windy 🌬️"])
+        
+        # Get random condition
+        import random
+        return random.choice(conditions)
+        
+    def get_supported_locations(self):
+        """Return list of locations with good data coverage."""
+        return ["New York", "London", "Tokyo", "Sydney", "Paris", "Berlin"]`;
 
   return (
-    <div className="mt-12">
-      <header className="mb-8">
-        <h1 className="brutalist-header">WEATHER API EXPLORER</h1>
-        <p className="text-center uppercase text-secondary">
-          PYTHON IMPLEMENTATION FOR OPENWEATHERMAP API
-        </p>
-      </header>
-
-      <div className="brutalist-card">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
-          <h2 className="brutalist-title flex items-center gap-2">
-            <span>FUNCTION IMPLEMENTATION</span>
-          </h2>
-          <button
-            className="brutalist-btn mt-4 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2"
-            onClick={handleCopyCode}
-          >
-            {isCopied ? "COPIED!" : "COPY CODE"}
-          </button>
-        </div>
-
-        <pre className="bg-black text-white p-4 overflow-x-auto font-mono text-sm max-h-[500px] overflow-y-auto">
-          {pythonCode}
-        </pre>
+    <div className="brutalist-card mt-6">
+      <div className="card-header">
+        <h2 className="brutalist-title">
+          <i className="fas fa-cloud-sun mr-2"></i>
+          WEATHER API EXPLORER
+        </h2>
       </div>
 
-      <div className="brutalist-card mt-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
-          <h2 className="brutalist-title">TRY IT OUT</h2>
-        </div>
-
-        <div className="mb-4">
-          <label className="block font-bold mb-2">API KEY</label>
-          <input
-            type="text"
-            className="brutalist-input"
-            placeholder="Your OpenWeatherMap API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-        </div>
-
-        <div className="mb-6">
-          <label className="block font-bold mb-2">LOCATION</label>
-          <input
-            type="text"
-            className="brutalist-input"
-            placeholder="City name or 'City,Country' (e.g., 'London,UK')"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
-        </div>
-
-        <button
-          className="brutalist-btn w-full mb-6"
-          onClick={handleTestFunction}
-          disabled={isLoading}
-        >
-          {isLoading ? "TESTING..." : "TEST FUNCTION"}
-        </button>
-
-        <div className="bg-gray-100 p-4 border-2 border-black">
-          {testResult ? (
-            <div
-              className="font-mono"
-              dangerouslySetInnerHTML={{ __html: testResult }}
-            />
-          ) : (
-            <div className="font-mono">Results will appear here...</div>
-          )}
-          {errorMessage && (
-            <div className="text-red-500 mt-2 font-bold">{errorMessage}</div>
-          )}
-        </div>
-      </div>
-
-      <div className="brutalist-card mt-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
-          <h2 className="brutalist-title">DOCUMENTATION</h2>
-        </div>
-
-        <div className="mb-6 border-b-2 border-black pb-2">
-          <button
-            className={`mr-4 py-2 px-4 ${
-              activeTab === "usageTab"
-                ? "bg-black text-white"
-                : "bg-gray-200 text-black"
-            }`}
-            onClick={() => openTab("usageTab")}
-          >
-            USAGE
-          </button>
-          <button
-            className={`mr-4 py-2 px-4 ${
-              activeTab === "paramsTab"
-                ? "bg-black text-white"
-                : "bg-gray-200 text-black"
-            }`}
-            onClick={() => openTab("paramsTab")}
-          >
-            PARAMETERS
-          </button>
-          <button
-            className={`mr-4 py-2 px-4 ${
-              activeTab === "returnsTab"
-                ? "bg-black text-white"
-                : "bg-gray-200 text-black"
-            }`}
-            onClick={() => openTab("returnsTab")}
-          >
-            RETURNS
-          </button>
-          <button
-            className={`py-2 px-4 ${
-              activeTab === "errorsTab"
-                ? "bg-black text-white"
-                : "bg-gray-200 text-black"
-            }`}
-            onClick={() => openTab("errorsTab")}
-          >
-            ERROR HANDLING
-          </button>
-        </div>
-
-        {activeTab === "usageTab" && (
-          <div>
-            <h3 className="font-bold text-lg mb-2">Basic Usage Example</h3>
-            <pre className="bg-gray-100 p-3 rounded mb-4 font-mono text-sm">
-              {`# Import the function
-from weather_utils import get_simplified_weather
-
-# Call with your API key and location
-try:
-    condition = get_simplified_weather("your_api_key", "London,UK")
-    print(f"Current weather: {condition}")
-except ValueError as e:
-    print(f"Error: {e}")`}
-            </pre>
-            <p>
-              This function provides a simplified interface to the OpenWeatherMap
-              API, returning just the most relevant weather condition with emoji
-              decoration.
-            </p>
-          </div>
-        )}
-
-        {activeTab === "paramsTab" && (
-          <div>
-            <h3 className="font-bold text-lg mb-2">Parameters</h3>
-            <ul className="list-disc pl-5 mb-4">
-              <li>
-                <strong>api_key</strong> (str) - Your OpenWeatherMap API key
-                (required)
-              </li>
-              <li>
-                <strong>location</strong> (str) - City name or "City,Country"
-                format (required)
-              </li>
-            </ul>
-            <p>
-              You can get a free API key by signing up at{" "}
-              <a
-                href="https://openweathermap.org/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <div className="mb-4">
+            <label className="form-label mb-1">Location</label>
+            <div className="flex">
+              <input
+                type="text"
+                className="brutalist-input flex-grow"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Enter location (e.g., New York)"
+              />
+              <Button 
+                className="brutalist-btn ml-2"
+                onClick={handleGetWeather}
+                disabled={isLoading}
               >
-                openweathermap.org
-              </a>
-              .
-            </p>
-          </div>
-        )}
-
-        {activeTab === "returnsTab" && (
-          <div>
-            <h3 className="font-bold text-lg mb-2">Return Values</h3>
-            <p className="mb-2">
-              The function returns a plain text string representing the current
-              weather condition. Common returns include:
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <ul className="list-disc pl-5">
-                <li>'Clear ☀️'</li>
-                <li>'Rain 🌧️'</li>
-                <li>'Snow ❄️'</li>
-                <li>'Cloudy ☁️'</li>
-              </ul>
-              <ul className="list-disc pl-5">
-                <li>'Partly Cloudy ⛅'</li>
-                <li>'Thunderstorm ⚡'</li>
-                <li>'Drizzle 🌦️'</li>
-                <li>'Windy 🌬️'</li>
-              </ul>
+                {isLoading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-1"></i> Loading...
+                  </>
+                ) : (
+                  <>Get Weather</>
+                )}
+              </Button>
             </div>
           </div>
-        )}
 
-        {activeTab === "errorsTab" && (
-          <div>
-            <h3 className="font-bold text-lg mb-2">Error Handling</h3>
-            <p className="mb-2">The function may raise these exceptions:</p>
-            <ul className="list-disc pl-5 mb-4">
-              <li>
-                <strong>ValueError</strong> - For invalid API responses or
-                missing data
-              </li>
-              <li>
-                <strong>requests.exceptions.RequestException</strong> - For
-                network/connection errors
-              </li>
-            </ul>
-            <p>
-              Always call the function within a try-except block to handle
-              potential errors gracefully.
-            </p>
+          <div className="p-4 border-2 border-black mb-4">
+            <h3 className="font-bold mb-2">Current Weather</h3>
+            {weatherCondition ? (
+              <div className="text-2xl font-bold">{weatherCondition}</div>
+            ) : (
+              <div className="text-gray-500">No weather data fetched yet</div>
+            )}
           </div>
-        )}
+
+          <div className="p-4 border-2 border-black">
+            <h3 className="font-bold mb-2">Supported Locations</h3>
+            <div className="flex flex-wrap gap-2">
+              {["New York", "London", "Tokyo", "Sydney", "Paris", "Berlin"].map((city) => (
+                <button
+                  key={city}
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-sm"
+                  onClick={() => setLocation(city)}
+                >
+                  {city}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-bold mb-2">Python Implementation</h3>
+          <div className="bg-black text-gray-300 font-mono text-sm p-4 overflow-auto h-[400px]">
+            {pythonCode}
+          </div>
+        </div>
       </div>
     </div>
   );

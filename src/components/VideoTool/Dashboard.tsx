@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
@@ -8,13 +7,16 @@ import { ConversationSystem } from "./ConversationSystem";
 import { EthicalProcessor } from "./EthicalProcessor";
 import { WeatherAPIExplorer } from "./WeatherAPIExplorer";
 import { PersonaAPI } from "./PersonaAPI";
-import { initializeDatabase } from "@/lib/supabase";
+import { ElevenLabsWidget } from "./ElevenLabsWidget";
+import { initializeDatabase, getWeatherForLocation } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [dbInitialized, setDbInitialized] = useState(false);
+  const [ethicalScore, setEthicalScore] = useState(50);
+  const [weatherState, setWeatherState] = useState("Clear ☀️");
   const [evalData, setEvalData] = useState({
     mistralLatency: "--",
     llamaLatency: "--",
@@ -34,6 +36,15 @@ export const Dashboard: React.FC = () => {
             title: "Database Initialized",
             description: "Successfully connected to Supabase and initialized database.",
           });
+          
+          // Fetch initial weather data
+          try {
+            const weatherCondition = await getWeatherForLocation("New York");
+            setWeatherState(weatherCondition || "Clear ☀️");
+          } catch (error) {
+            console.error("Failed to fetch weather data:", error);
+            // Keep default weather state
+          }
         } else {
           toast({
             title: "Database Initialization Warning",
@@ -79,6 +90,21 @@ export const Dashboard: React.FC = () => {
     }, 3000);
   };
 
+  const updateEthicalScore = (newScore: number) => {
+    setEthicalScore(newScore);
+  };
+
+  const updateWeatherState = async (location: string) => {
+    try {
+      const weatherCondition = await getWeatherForLocation(location);
+      setWeatherState(weatherCondition || "Clear ☀️");
+      return weatherCondition;
+    } catch (error) {
+      console.error(`Failed to fetch weather for ${location}:`, error);
+      return null;
+    }
+  };
+
   return (
     <div className="brutalist-container">
       <header className="mb-8">
@@ -92,6 +118,11 @@ export const Dashboard: React.FC = () => {
           </p>
         )}
       </header>
+
+      <ElevenLabsWidget 
+        ethicalScore={ethicalScore} 
+        weatherState={weatherState} 
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Sidebar onEvaluate={handleEvaluate} />
@@ -110,9 +141,9 @@ export const Dashboard: React.FC = () => {
 
       <EthicalProcessor />
       
-      <WeatherAPIExplorer />
+      <WeatherAPIExplorer onWeatherUpdate={updateWeatherState} />
       
-      <PersonaAPI />
+      <PersonaAPI onEthicalScoreUpdate={updateEthicalScore} />
     </div>
   );
 };

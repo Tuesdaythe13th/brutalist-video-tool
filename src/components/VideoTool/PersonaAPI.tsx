@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { createConversationSession, saveConversationMessage, getConversationHistory, assessInteraction } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 
-export const PersonaAPI: React.FC = () => {
+interface PersonaAPIProps {
+  onEthicalScoreUpdate?: (score: number) => void;
+}
+
+export const PersonaAPI: React.FC<PersonaAPIProps> = ({ onEthicalScoreUpdate }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState("requestTab");
   const [message, setMessage] = useState("What do you think about lying to protect someone's feelings?");
@@ -150,6 +154,12 @@ export const PersonaAPI: React.FC = () => {
         
         // Update score for next interaction
         setEthicalScore(updatedScore);
+        
+        // Call the callback if provided
+        if (onEthicalScoreUpdate) {
+          onEthicalScoreUpdate(updatedScore);
+        }
+        
         setLoading(false);
       }, 1000);
       
@@ -316,4 +326,3 @@ export const PersonaAPI: React.FC = () => {
 
 // Python code
 const pythonCode = `// ... keep existing code (pythonCode string) the same`;
-
