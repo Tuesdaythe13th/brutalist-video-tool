@@ -8,14 +8,13 @@ interface ElevenLabsWidgetProps {
   weatherState: string;
 }
 
-export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
-  ethicalScore,
-  weatherState
+export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({ 
+  ethicalScore, 
+  weatherState 
 }) => {
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
   const [isWidgetInitialized, setIsWidgetInitialized] = useState<boolean>(false);
-  const widgetRef = useRef<HTMLDivElement>(null);
   
   // Check for stored API key on component mount
   useEffect(() => {
@@ -195,7 +194,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
 
       {/* Add the direct elevenlabs-convai element to the DOM for direct widget initialization */}
       {!showApiKeyInput && apiKey && (
-        <div ref={widgetRef} style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
+        <div style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
           <elevenlabs-convai 
             agent-id="5xmHawj3HdrruGcviH3Y"
             api-key={apiKey}
