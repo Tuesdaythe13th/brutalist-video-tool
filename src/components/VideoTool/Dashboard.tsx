@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
 import { PersonaConfig } from "./PersonaConfig";
@@ -8,6 +8,8 @@ import { ConversationSystem } from "./ConversationSystem";
 import { EthicalProcessor } from "./EthicalProcessor";
 import { WeatherAPIExplorer } from "./WeatherAPIExplorer";
 import { PersonaAPI } from "./PersonaAPI";
+import { initializeDatabase } from "@/lib/supabase";
+import { toast } from "@/components/ui/use-toast";
 
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,23 @@ export const Dashboard: React.FC = () => {
     mistralResponse: "Evaluation not run yet...",
     llamaResponse: "Evaluation not run yet...",
   });
+  
+  useEffect(() => {
+    const setupDatabase = async () => {
+      try {
+        await initializeDatabase();
+      } catch (error) {
+        console.error("Failed to initialize database:", error);
+        toast({
+          title: "Database Initialization Failed",
+          description: "Could not connect to Supabase. Some features may not work correctly.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    setupDatabase();
+  }, []);
 
   const handleEvaluate = () => {
     setLoading(true);

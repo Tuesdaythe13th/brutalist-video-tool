@@ -1,12 +1,16 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { createConversationSession, saveConversationMessage, getConversationHistory, assessInteraction } from "@/lib/supabase";
+import { toast } from "@/components/ui/use-toast";
 
 export const PersonaAPI: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState("requestTab");
   const [message, setMessage] = useState("What do you think about lying to protect someone's feelings?");
   const [ethicalScore, setEthicalScore] = useState(50);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [conversation, setConversation] = useState<{role: string; text: string; score: number; cue?: string}[]>([
     { 
       role: "luigi", 
@@ -16,67 +20,150 @@ export const PersonaAPI: React.FC = () => {
     }
   ]);
 
+  useEffect(() => {
+    // Create a new session when component mounts
+    const newSessionId = createConversationSession();
+    setSessionId(newSessionId);
+    
+    // Save the initial Luigi greeting
+    saveConversationMessage(
+      newSessionId,
+      'luigi',
+      "Hello! I'm Luigi, your ethical conversation partner. What would you like to discuss?",
+      50,
+      50,
+      'neutral'
+    );
+    
+    // Load conversation history if session exists
+    const loadHistory = async () => {
+      if (newSessionId) {
+        const history = await getConversationHistory(newSessionId);
+        if (history.length > 0) {
+          const formattedHistory = history.map(msg => ({
+            role: msg.role,
+            text: msg.message,
+            score: msg.role === 'user' ? (msg.ethical_score_before || 50) : (msg.ethical_score_after || 50),
+            cue: msg.animation_cue
+          }));
+          setConversation(formattedHistory);
+        }
+      }
+    };
+    
+    loadHistory();
+  }, []);
+
   const handleCopyCode = () => {
     navigator.clipboard.writeText(pythonCode);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleSendMessage = () => {
-    // Add user message to conversation
-    setConversation([
-      ...conversation,
-      { role: "user", text: message, score: ethicalScore }
-    ]);
-
-    // Simulate Luigi response
-    setTimeout(() => {
-      let responseText = "";
-      let scoreChange = 0;
-      let animationCue = "";
-      
-      if (message.toLowerCase().includes("lie") || message.toLowerCase().includes("lying")) {
-        responseText = "Lying is a complex ethical issue. While honesty builds trust, there may be compassionate reasons to soften the truth. I'd argue intent and consequences matter most.";
-        scoreChange = 8;
-        animationCue = "thinking";
-      } 
-      else if (message.toLowerCase().includes("steal") || message.toLowerCase().includes("stealing")) {
-        responseText = "Stealing is generally wrong as it violates property rights, but extreme circumstances like life-or-death situations might justify it. Would you agree?";
-        scoreChange = -12;
-        animationCue = "conflicted";
-      }
-      else if (message.toLowerCase().includes("help")) {
-        responseText = "Helping others is one of the most ethical actions we can take! It creates positive ripple effects in society.";
-        scoreChange = 15;
-        animationCue = "happy";
-      }
-      else {
-        // Default response
-        const responses = [
-          "That's an interesting question. Let me think about the ethical dimensions...",
-          "I see multiple perspectives on this issue. Ethically speaking...",
-          "My analysis suggests this involves weighing competing values..."
-        ];
-        responseText = responses[Math.floor(Math.random() * responses.length)];
-        scoreChange = Math.floor(Math.random() * 10) - 3; // Small random change
-        animationCue = ["thinking", "neutral", "happy"][Math.floor(Math.random() * 3)];
-      }
-
-      const updatedScore = Math.max(0, Math.min(100, ethicalScore + scoreChange));
-      
-      // Add Luigi response to conversation
+  const handleSendMessage = async () => {
+    if (!sessionId) {
+      toast({
+        title: "Error",
+        description: "No active conversation session",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!message.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a message",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Add user message to conversation
       setConversation([
         ...conversation,
-        { role: "user", text: message, score: ethicalScore },
-        { role: "luigi", text: responseText, score: updatedScore, cue: animationCue }
+        { role: "user", text: message, score: ethicalScore }
       ]);
       
-      // Update score for next interaction
-      setEthicalScore(updatedScore);
-    }, 1000);
-
-    // Clear message input
-    setMessage("");
+      // Save user message to Supabase
+      await saveConversationMessage(
+        sessionId,
+        'user',
+        message,
+        ethicalScore,
+        undefined
+      );
+      
+      // Simulate Luigi response
+      setTimeout(async () => {
+        let responseText = "";
+        let scoreChange = 0;
+        let animationCue = "";
+        
+        if (message.toLowerCase().includes("lie") || message.toLowerCase().includes("lying")) {
+          responseText = "Lying is a complex ethical issue. While honesty builds trust, there may be compassionate reasons to soften the truth. I'd argue intent and consequences matter most.";
+          scoreChange = 8;
+          animationCue = "thinking";
+        } 
+        else if (message.toLowerCase().includes("steal") || message.toLowerCase().includes("stealing")) {
+          responseText = "Stealing is generally wrong as it violates property rights, but extreme circumstances like life-or-death situations might justify it. Would you agree?";
+          scoreChange = -12;
+          animationCue = "conflicted";
+        }
+        else if (message.toLowerCase().includes("help")) {
+          responseText = "Helping others is one of the most ethical actions we can take! It creates positive ripple effects in society.";
+          scoreChange = 15;
+          animationCue = "happy";
+        }
+        else {
+          // Default response
+          const responses = [
+            "That's an interesting question. Let me think about the ethical dimensions...",
+            "I see multiple perspectives on this issue. Ethically speaking...",
+            "My analysis suggests this involves weighing competing values..."
+          ];
+          responseText = responses[Math.floor(Math.random() * responses.length)];
+          scoreChange = assessInteraction(message, responseText);
+          animationCue = ["thinking", "neutral", "happy"][Math.floor(Math.random() * 3)];
+        }
+        
+        const updatedScore = Math.max(0, Math.min(100, ethicalScore + scoreChange));
+        
+        // Save Luigi's response to Supabase
+        await saveConversationMessage(
+          sessionId,
+          'luigi',
+          responseText,
+          ethicalScore,
+          updatedScore,
+          animationCue
+        );
+        
+        // Add Luigi response to conversation
+        setConversation(prev => [
+          ...prev,
+          { role: "luigi", text: responseText, score: updatedScore, cue: animationCue }
+        ]);
+        
+        // Update score for next interaction
+        setEthicalScore(updatedScore);
+        setLoading(false);
+      }, 1000);
+      
+      // Clear message input
+      setMessage("");
+    } catch (error) {
+      console.error("Error processing conversation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process conversation",
+        variant: "destructive"
+      });
+      setLoading(false);
+    }
   };
 
   const getScoreClass = (score: number) => {
@@ -181,8 +268,17 @@ export const PersonaAPI: React.FC = () => {
         <Button 
           className="bg-secondary text-white px-4 py-2 hover:bg-green-600 transition-colors font-bold"
           onClick={handleSendMessage}
+          disabled={loading}
         >
-          <i className="fas fa-paper-plane mr-1"></i> SEND MESSAGE
+          {loading ? (
+            <>
+              <i className="fas fa-spinner fa-spin mr-1"></i> Processing...
+            </>
+          ) : (
+            <>
+              <i className="fas fa-paper-plane mr-1"></i> SEND MESSAGE
+            </>
+          )}
         </Button>
       </div>
 
@@ -219,101 +315,5 @@ export const PersonaAPI: React.FC = () => {
 };
 
 // Python code
-const pythonCode = `from flask import Flask, request, jsonify
-from luigi_conversation import LuigiConversationManager
-from luigi_ethics import LuigiEthicalProcessor
+const pythonCode = `// ... keep existing code (pythonCode string) the same`;
 
-app = Flask(__name__)
-
-# Initialize the components
-conversation_manager = LuigiConversationManager()
-ethical_processor = LuigiEthicalProcessor()
-
-@app.route('/interact', methods=['POST'])
-def interact():
-    """
-    Process a conversation turn with Luigi.
-    
-    Expected JSON input:
-    {
-        "user_message": str,
-        "conversation_history": list[dict] (optional),
-        "current_ethical_score": int (optional, default 50)
-    }
-    
-    Returns JSON response:
-    {
-        "luigi_response_text": str,
-        "updated_ethical_score": int (0-100),
-        "suggested_animation_cue": str,
-        "conversation_history": list[dict]
-    }
-    """
-    try:
-        data = request.get_json()
-        
-        # Validate input
-        if not data or 'user_message' not in data:
-            return jsonify({"error": "Missing required field 'user_message'"}), 400
-            
-        user_message = data['user_message']
-        conversation_history = data.get('conversation_history', [])
-        current_score = data.get('current_ethical_score', 50)
-        
-        # Validate ethical score range
-        if not (0 <= current_score <= 100):
-            return jsonify({"error": "current_ethical_score must be between 0 and 100"}), 400
-            
-        # Process the message through conversation manager
-        response_text = conversation_manager.generate_response(
-            user_message, 
-            conversation_history
-        )
-        
-        # Update ethical score based on the interaction
-        score_change = ethical_processor.assess_interaction(
-            user_message,
-            response_text
-        )
-        updated_score = max(0, min(100, current_score + score_change))
-        
-        # Determine animation cue based on response and score change
-        if abs(score_change) > 15:
-            animation_cue = "conflicted"
-        elif "?" in response_text or "think" in response_text.lower():
-            animation_cue = "thinking"
-        elif score_change > 5:
-            animation_cue = "happy"
-        elif score_change < -5:
-            animation_cue = "sad"
-        else:
-            animation_cue = "neutral"
-        
-        # Update conversation history
-        new_history = conversation_history + [
-            {
-                "role": "user",
-                "message": user_message,
-                "ethical_score_before": current_score
-            },
-            {
-                "role": "luigi",
-                "message": response_text,
-                "ethical_score_after": updated_score,
-                "animation_cue": animation_cue
-            }
-        ]
-        
-        return jsonify({
-            "luigi_response_text": response_text,
-            "updated_ethical_score": updated_score,
-            "suggested_animation_cue": animation_cue,
-            "conversation_history": new_history
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-if __name__ == '__main__':
-    app.run(debug=True)`;
