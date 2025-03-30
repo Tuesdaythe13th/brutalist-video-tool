@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +16,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
-  const [hasCheckedStorage, setHasCheckedStorage] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // Create the prompt with the dynamic variables
   const getPrompt = () => `You are Luigi Lore, an assistant that helps with ethical assessment. 
@@ -41,6 +40,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         description: "Voice assistant connected successfully!",
       });
       setIsInitialized(true);
+      setIsLoading(false);
     },
     onDisconnect: () => {
       setIsInitialized(false);
@@ -57,13 +57,22 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         variant: "destructive",
       });
       setIsInitialized(false);
+      setIsLoading(false);
     }
   });
   
   // Auto-initialize widget if API key exists in storage
   useEffect(() => {
-    const storedKey = window.localStorage.getItem("elevenlabs_api_key");
+    // Try to get API key from localStorage first
+    let storedKey = localStorage.getItem("elevenlabs_api_key");
+    
+    // If not in localStorage, try to get from sessionStorage (helpful for development/testing)
+    if (!storedKey) {
+      storedKey = sessionStorage.getItem("elevenlabs_api_key");
+    }
+    
     if (storedKey) {
+      console.log("Found stored API key, initializing widget automatically");
       setApiKey(storedKey);
       setShowApiKeyInput(false);
       
@@ -78,6 +87,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           console.error("Auto-initialization failed:", error);
           // If auto-init fails, show API key input again
           setShowApiKeyInput(true);
+          setIsLoading(false);
           toast({
             title: "Connection Failed",
             description: "Saved API key is invalid or expired. Please enter a new key.",
@@ -87,8 +97,9 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       };
       
       autoInitialize();
+    } else {
+      setIsLoading(false);
     }
-    setHasCheckedStorage(true);
   }, []);
 
   // Update conversation when ethicalScore or weatherState change
@@ -110,18 +121,22 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
 
     try {
-      // Store API key in localStorage
-      window.localStorage.setItem("elevenlabs_api_key", apiKey);
+      setIsLoading(true);
+      // Store API key in both localStorage and sessionStorage for redundancy
+      localStorage.setItem("elevenlabs_api_key", apiKey);
+      sessionStorage.setItem("elevenlabs_api_key", apiKey);
+      
       setShowApiKeyInput(false);
       
       // Start the conversation session with correct parameter structure
       await conversation.startSession({
         agentId: "5xmHawj3HdrruGcviH3Y",
-        authorization: apiKey // Use authorization instead of apiKey
+        authorization: apiKey
       });
       
     } catch (error) {
       console.error("Failed to initialize widget:", error);
+      setIsLoading(false);
       toast({
         title: "Widget Initialization Failed",
         description: "Could not initialize the ElevenLabs widget. Please check your API key.",
@@ -135,7 +150,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       await conversation.endSession();
       setIsInitialized(false);
       setShowApiKeyInput(true);
-      localStorage.removeItem("elevenlabs_api_key");
+      // Keep the API key in storage unless explicitly cleared
       toast({
         title: "Widget Removed",
         description: "ElevenLabs voice assistant has been removed.",
@@ -145,14 +160,30 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   };
 
-  if (!hasCheckedStorage) {
+  const clearSavedKey = () => {
+    localStorage.removeItem("elevenlabs_api_key");
+    sessionStorage.removeItem("elevenlabs_api_key");
+    setApiKey("");
+    toast({
+      title: "API Key Removed",
+      description: "Your saved API key has been removed from browser storage.",
+    });
+  };
+
+  if (isLoading) {
     return (
       <div className="brutalist-card mb-6">
         <div className="card-header">
           <h2 className="brutalist-title">LUIGI LORE VOICE INTERFACE</h2>
         </div>
         <div className="p-4 border-2 border-black flex justify-center items-center">
-          <p>Loading voice assistant...</p>
+          <p className="flex items-center">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading voice assistant...
+          </p>
         </div>
       </div>
     );
@@ -230,6 +261,12 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
                 className="bg-red-500 hover:bg-red-600 text-white"
               >
                 Remove Voice Assistant
+              </Button>
+              <Button 
+                onClick={clearSavedKey}
+                className="bg-gray-500 hover:bg-gray-600 text-white"
+              >
+                Clear Saved API Key
               </Button>
             </div>
           </div>
