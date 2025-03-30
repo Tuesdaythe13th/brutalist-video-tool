@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
@@ -108,17 +107,11 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="brutalist-container">
-      {/* ElevenLabs Convai Widget */}
-      <div className="mb-6 w-full">
-        <elevenlabs-convai 
-          agent-id="5xmHawj3HdrruGcviH3Y"
-          dynamic-variables={JSON.stringify({
-            current_ethical_score: ethicalScore,
-            current_weather_state: weatherState
-          })}
-          className="w-full"
-        ></elevenlabs-convai>
-      </div>
+      {/* ElevenLabs Widget Component */}
+      <ElevenLabsWidget 
+        ethicalScore={ethicalScore} 
+        weatherState={weatherState} 
+      />
       
       <header className="mb-8">
         <h1 className="brutalist-header">LLM EVALUATION DASHBOARD</h1>
@@ -131,11 +124,6 @@ export const Dashboard: React.FC = () => {
           </p>
         )}
       </header>
-
-      <ElevenLabsWidget 
-        ethicalScore={ethicalScore} 
-        weatherState={weatherState} 
-      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Sidebar onEvaluate={handleEvaluate} />

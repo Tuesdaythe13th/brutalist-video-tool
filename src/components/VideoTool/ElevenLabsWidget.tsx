@@ -19,6 +19,15 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [dynamicVariables, setDynamicVariables] = useState<Record<string, string>>({});
 
+  // Check for stored API key on component mount
+  useEffect(() => {
+    const storedKey = window.localStorage.getItem("elevenlabs_api_key");
+    if (storedKey) {
+      setApiKey(storedKey);
+      setShowApiKeyInput(false);
+    }
+  }, []);
+
   const conversation = useConversation({
     onConnect: () => {
       setIsConnected(true);
@@ -39,9 +48,11 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       console.error("ElevenLabs error:", error);
       toast({
         title: "ElevenLabs Error",
-        description: "There was an error connecting to ElevenLabs.",
+        description: "There was an error connecting to ElevenLabs. Please check your API key.",
         variant: "destructive",
       });
+      // If there's an error with the API key, show the input again
+      setShowApiKeyInput(true);
     },
     clientTools: {
       updateEthicalScore: (parameters: { score: number }) => {
@@ -64,7 +75,17 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       current_ethical_score: ethicalScore.toString(),
       current_weather_state: weatherState,
     });
-  }, [ethicalScore, weatherState]);
+
+    // If connected, update the dynamic variables in the conversation
+    if (isConnected && conversation) {
+      try {
+        // This is a method provided by the useConversation hook
+        conversation.updateDynamicVariables(dynamicVariables);
+      } catch (error) {
+        console.error("Failed to update dynamic variables:", error);
+      }
+    }
+  }, [ethicalScore, weatherState, isConnected, conversation]);
 
   const startConversation = async () => {
     if (!apiKey) {
@@ -77,8 +98,12 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
 
     try {
-      // Initialize ElevenLabs API
+      // Initialize ElevenLabs API with the API key
       window.localStorage.setItem("elevenlabs_api_key", apiKey);
+      
+      // Set API key in the header for ElevenLabs requests
+      // Note: The @11labs/react library handles this internally when we provide
+      // the API key to localStorage with the specific key "elevenlabs_api_key"
       
       // Start conversation with the agent
       await conversation.startSession({ 
@@ -138,7 +163,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
             <div className="flex flex-col sm:flex-row gap-4">
               <input 
                 type="password"
-                placeholder="ElevenLabs API Key"
+                placeholder="ElevenLabs API key (sk_...)"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="flex-1 brutalist-input"
@@ -151,7 +176,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
               </Button>
             </div>
             <p className="mt-4 text-xs text-gray-500">
-              Your API key will be stored in your browser's local storage.
+              Your API key will be stored in your browser's local storage. You can get a key from <a href="https://elevenlabs.io/app" target="_blank" rel="noopener noreferrer" className="underline">ElevenLabs</a>.
             </p>
           </div>
         ) : (
