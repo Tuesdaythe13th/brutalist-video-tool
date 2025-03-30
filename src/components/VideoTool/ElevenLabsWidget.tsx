@@ -17,7 +17,10 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [agentId] = useState<string>("5xmHawj3HdrruGcviH3Y"); // Luigi Lore agent ID
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [dynamicVariables, setDynamicVariables] = useState<Record<string, string>>({});
+  const [dynamicVariables, setDynamicVariables] = useState<Record<string, string>>({
+    current_ethical_score: "50",
+    current_weather_state: "Clear ☀️",
+  });
 
   // Check for stored API key on component mount
   useEffect(() => {
@@ -69,23 +72,34 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   });
 
+  // Update dynamic variables when props change
   useEffect(() => {
-    // Update dynamic variables when props change
     setDynamicVariables({
       current_ethical_score: ethicalScore.toString(),
       current_weather_state: weatherState,
     });
+  }, [ethicalScore, weatherState]);
 
-    // If connected, update the dynamic variables in the conversation
-    if (isConnected && conversation) {
+  // Handle session restart when dynamic variables change
+  useEffect(() => {
+    // Only update if already connected and conversation exists
+    if (isConnected && conversation && !showApiKeyInput) {
       try {
-        // This is a method provided by the useConversation hook
-        conversation.updateDynamicVariables(dynamicVariables);
+        // End current session and restart with new variables
+        const restartSession = async () => {
+          await conversation.endSession();
+          await conversation.startSession({
+            agentId,
+            dynamicVariables
+          });
+        };
+        
+        restartSession();
       } catch (error) {
-        console.error("Failed to update dynamic variables:", error);
+        console.error("Failed to update session with new variables:", error);
       }
     }
-  }, [ethicalScore, weatherState, isConnected, conversation]);
+  }, [dynamicVariables, isConnected, conversation, agentId, showApiKeyInput]);
 
   const startConversation = async () => {
     if (!apiKey) {
