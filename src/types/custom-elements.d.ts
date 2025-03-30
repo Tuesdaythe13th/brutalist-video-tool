@@ -1,10 +1,19 @@
 
-// This file contains type definitions for custom elements used in the application
+// This file contains custom element type definitions
 
-// Elevenlabs Widget globals
+declare namespace JSX {
+  interface IntrinsicElements {
+    'elevenlabs-convai': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      'agent-id'?: string;
+      'api-key'?: string;
+      'dynamic-variables'?: string;
+    };
+  }
+}
+
 interface Window {
   ElevenLabsWidget?: {
-    init: (options: { 
+    init: (config: {
       apiKey: string;
       agentId: string;
       dynamicVariables?: Record<string, string>;
@@ -12,15 +21,4 @@ interface Window {
     destroy: () => void;
     updateDynamicVariables: (variables: Record<string, string>) => void;
   };
-}
-
-// ElevenLabs convai widget element
-declare namespace JSX {
-  interface IntrinsicElements {
-    'elevenlabs-convai': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
-      'agent-id'?: string;
-      'dynamic-variables'?: string;
-      'api-key'?: string;
-    }, HTMLElement>;
-  }
 }
