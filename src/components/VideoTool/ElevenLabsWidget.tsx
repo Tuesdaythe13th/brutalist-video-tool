@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from "react";
-import { useConversation } from "@11labs/react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 
@@ -14,14 +13,9 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   weatherState 
 }) => {
   const [apiKey, setApiKey] = useState<string>("");
-  const [agentId] = useState<string>("5xmHawj3HdrruGcviH3Y"); // Luigi Lore agent ID
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [dynamicVariables, setDynamicVariables] = useState<Record<string, string>>({
-    current_ethical_score: "50",
-    current_weather_state: "Clear ☀️",
-  });
-
+  const [isWidgetInitialized, setIsWidgetInitialized] = useState<boolean>(false);
+  
   // Check for stored API key on component mount
   useEffect(() => {
     const storedKey = window.localStorage.getItem("elevenlabs_api_key");
@@ -31,77 +25,61 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   }, []);
 
-  const conversation = useConversation({
-    onConnect: () => {
-      setIsConnected(true);
-      toast({
-        title: "Connected to ElevenLabs",
-        description: "Luigi Lore is now ready to chat!",
-      });
-    },
-    onDisconnect: () => {
-      setIsConnected(false);
-      toast({
-        title: "Disconnected from ElevenLabs",
-        description: "Luigi Lore has left the conversation.",
-        variant: "destructive",
-      });
-    },
-    onError: (error) => {
-      console.error("ElevenLabs error:", error);
-      toast({
-        title: "ElevenLabs Error",
-        description: "There was an error connecting to ElevenLabs. Please check your API key.",
-        variant: "destructive",
-      });
-      // If there's an error with the API key, show the input again
-      setShowApiKeyInput(true);
-    },
-    clientTools: {
-      updateEthicalScore: (parameters: { score: number }) => {
+  // Initialize widget when API key is provided
+  useEffect(() => {
+    if (!showApiKeyInput && apiKey && !isWidgetInitialized) {
+      try {
+        // Check if the ElevenLabs widget script is loaded
+        if (window.ElevenLabsWidget) {
+          // Initialize widget with provided API key
+          window.ElevenLabsWidget.init({
+            apiKey: apiKey,
+            agentId: "5xmHawj3HdrruGcviH3Y",
+            dynamicVariables: {
+              current_ethical_score: ethicalScore.toString(),
+              current_weather_state: weatherState
+            }
+          });
+          setIsWidgetInitialized(true);
+          toast({
+            title: "ElevenLabs Widget Initialized",
+            description: "Luigi Lore widget is now ready!",
+          });
+        } else {
+          console.error("ElevenLabs widget script is not loaded");
+          toast({
+            title: "Widget Script Not Found",
+            description: "ElevenLabs widget script could not be loaded.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error initializing ElevenLabs widget:", error);
         toast({
-          title: "Ethical Score Updated",
-          description: `New ethical score: ${parameters.score}`,
+          title: "Widget Initialization Failed",
+          description: "There was an error initializing the ElevenLabs widget.",
+          variant: "destructive",
         });
-        return "Score updated";
-      },
-      logConversation: (parameters: { message: string, role: string }) => {
-        console.log(`Logged ${parameters.role} message:`, parameters.message);
-        return "Conversation logged";
-      },
+        setShowApiKeyInput(true);
+      }
     }
-  });
+  }, [showApiKeyInput, apiKey, isWidgetInitialized, ethicalScore, weatherState]);
 
   // Update dynamic variables when props change
   useEffect(() => {
-    setDynamicVariables({
-      current_ethical_score: ethicalScore.toString(),
-      current_weather_state: weatherState,
-    });
-  }, [ethicalScore, weatherState]);
-
-  // Handle session restart when dynamic variables change
-  useEffect(() => {
-    // Only update if already connected and conversation exists
-    if (isConnected && conversation && !showApiKeyInput) {
+    if (isWidgetInitialized && window.ElevenLabsWidget) {
       try {
-        // End current session and restart with new variables
-        const restartSession = async () => {
-          await conversation.endSession();
-          await conversation.startSession({
-            agentId,
-            dynamicVariables
-          });
-        };
-        
-        restartSession();
+        window.ElevenLabsWidget.updateDynamicVariables({
+          current_ethical_score: ethicalScore.toString(),
+          current_weather_state: weatherState,
+        });
       } catch (error) {
-        console.error("Failed to update session with new variables:", error);
+        console.error("Failed to update widget dynamic variables:", error);
       }
     }
-  }, [dynamicVariables, isConnected, conversation, agentId, showApiKeyInput]);
+  }, [ethicalScore, weatherState, isWidgetInitialized]);
 
-  const startConversation = async () => {
+  const initializeWidget = () => {
     if (!apiKey) {
       toast({
         title: "API Key Required",
@@ -112,36 +90,32 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
 
     try {
-      // Initialize ElevenLabs API with the API key
+      // Store API key in localStorage
       window.localStorage.setItem("elevenlabs_api_key", apiKey);
-      
-      // Set API key in the header for ElevenLabs requests
-      // Note: The @11labs/react library handles this internally when we provide
-      // the API key to localStorage with the specific key "elevenlabs_api_key"
-      
-      // Start conversation with the agent
-      await conversation.startSession({ 
-        agentId,
-        dynamicVariables
-      });
-      
       setShowApiKeyInput(false);
     } catch (error) {
-      console.error("Failed to start conversation:", error);
+      console.error("Failed to initialize widget:", error);
       toast({
-        title: "Connection Failed",
-        description: "Could not connect to ElevenLabs. Please check your API key.",
+        title: "Widget Initialization Failed",
+        description: "Could not initialize the ElevenLabs widget. Please check your API key.",
         variant: "destructive",
       });
     }
   };
 
-  const endConversation = async () => {
+  const removeWidget = () => {
     try {
-      await conversation.endSession();
+      if (window.ElevenLabsWidget) {
+        window.ElevenLabsWidget.destroy();
+        setIsWidgetInitialized(false);
+      }
       setShowApiKeyInput(true);
+      toast({
+        title: "Widget Removed",
+        description: "ElevenLabs widget has been removed.",
+      });
     } catch (error) {
-      console.error("Error ending conversation:", error);
+      console.error("Error removing widget:", error);
     }
   };
 
@@ -152,15 +126,15 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           LUIGI LORE VOICE INTERFACE
         </h2>
         <div className="flex items-center gap-2">
-          {isConnected ? (
+          {isWidgetInitialized ? (
             <div className="flex items-center">
               <div className="bg-green-500 h-3 w-3 rounded-full mr-2"></div>
-              <span className="text-sm font-bold">CONNECTED</span>
+              <span className="text-sm font-bold">WIDGET ACTIVE</span>
             </div>
           ) : (
             <div className="flex items-center">
               <div className="bg-red-500 h-3 w-3 rounded-full mr-2"></div>
-              <span className="text-sm font-bold">DISCONNECTED</span>
+              <span className="text-sm font-bold">WIDGET INACTIVE</span>
             </div>
           )}
         </div>
@@ -183,10 +157,10 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
                 className="flex-1 brutalist-input"
               />
               <Button 
-                onClick={startConversation}
+                onClick={initializeWidget}
                 className="brutalist-btn"
               >
-                Connect
+                Initialize Widget
               </Button>
             </div>
             <p className="mt-4 text-xs text-gray-500">
@@ -195,60 +169,15 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           </div>
         ) : (
           <div className="flex flex-col items-center">
-            <div className="w-full max-w-lg p-4 border-2 border-black mb-4 bg-gray-100 min-h-[100px] flex items-center justify-center">
-              {conversation.isSpeaking ? (
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center space-x-1 mb-2">
-                    <div className="w-2 h-8 bg-black animate-pulse"></div>
-                    <div className="w-2 h-12 bg-black animate-pulse delay-100"></div>
-                    <div className="w-2 h-6 bg-black animate-pulse delay-200"></div>
-                    <div className="w-2 h-10 bg-black animate-pulse delay-300"></div>
-                    <div className="w-2 h-8 bg-black animate-pulse delay-400"></div>
-                  </div>
-                  <p className="text-sm">Luigi is speaking...</p>
-                </div>
-              ) : (
-                <p className="text-center">
-                  {isConnected ? "Speak to Luigi..." : "Connecting to Luigi Lore..."}
-                </p>
-              )}
-            </div>
-            
-            <div className="flex gap-4 mt-2">
-              <Button 
-                onClick={() => {
-                  conversation.setVolume({ volume: 0.5 });
-                  toast({
-                    title: "Volume Adjusted",
-                    description: "Luigi's voice volume set to 50%",
-                  });
-                }}
-                className="bg-gray-200 hover:bg-gray-300 text-black"
-                disabled={!isConnected}
-              >
-                Volume 50%
-              </Button>
-              <Button 
-                onClick={() => {
-                  conversation.setVolume({ volume: 1.0 });
-                  toast({
-                    title: "Volume Adjusted",
-                    description: "Luigi's voice volume set to 100%",
-                  });
-                }}
-                className="bg-gray-200 hover:bg-gray-300 text-black"
-                disabled={!isConnected}
-              >
-                Volume 100%
-              </Button>
-              <Button 
-                onClick={endConversation}
-                className="bg-red-500 hover:bg-red-600 text-white"
-                disabled={!isConnected}
-              >
-                End Conversation
-              </Button>
-            </div>
+            <p className="mb-4">
+              Luigi Lore widget is now active! You should see the widget button in the corner of your screen.
+            </p>
+            <Button 
+              onClick={removeWidget}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Remove Widget
+            </Button>
           </div>
         )}
       </div>
@@ -260,6 +189,24 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           <li>current_weather_state: {weatherState}</li>
         </ul>
       </div>
+
+      {/* This is where the widget will appear (it's injected by their script) */}
+      <div id="eleven-labs-widget-target"></div>
     </div>
   );
 };
+
+// Add TypeScript type declaration for the ElevenLabs widget
+declare global {
+  interface Window {
+    ElevenLabsWidget?: {
+      init: (options: { 
+        apiKey: string; 
+        agentId: string;
+        dynamicVariables?: Record<string, string>;
+      }) => void;
+      destroy: () => void;
+      updateDynamicVariables: (variables: Record<string, string>) => void;
+    };
+  }
+}
