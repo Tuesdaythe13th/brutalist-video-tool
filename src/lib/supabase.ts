@@ -1,7 +1,8 @@
+
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://grrejinocympspxqghnu.supabase.co'
-const supabaseKey = process.env.SUPABASE_KEY
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdycmVqaW5vY3ltcHNweHFnaG51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzNzMyNTEsImV4cCI6MjA1ODk0OTI1MX0.Dq9Mhe6tmZAk7KzYrfH8_GNvz_jvlSZo4uzC--ayLR0'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Add this function to create the Personas table
@@ -186,4 +187,96 @@ export const initializeDatabase = async () => {
     console.error("Error initializing database:", error);
     return false;
   }
+};
+
+// Add function to create a conversation session
+export const createConversationSession = (): string => {
+  // Simply generate a random session ID for now
+  return `session_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+};
+
+// Add function to save conversation messages
+export const saveConversationMessage = async (
+  sessionId: string,
+  role: 'user' | 'luigi', 
+  message: string,
+  ethicalScoreBefore?: number,
+  ethicalScoreAfter?: number,
+  animationCue?: string
+) => {
+  try {
+    const { error } = await supabase
+      .from('conversation_sessions')
+      .upsert({
+        session_id: sessionId,
+        role: role,
+        message: message,
+        ethical_score_before: ethicalScoreBefore,
+        ethical_score_after: ethicalScoreAfter,
+        animation_cue: animationCue,
+        created_at: new Date()
+      });
+    
+    if (error) {
+      console.error('Error saving conversation message:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving conversation message:', error);
+    return false;
+  }
+};
+
+// Add function to get conversation history
+export const getConversationHistory = async (sessionId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('conversation_sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching conversation history:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching conversation history:', error);
+    return [];
+  }
+};
+
+// Add function to assess interaction
+export const assessInteraction = (userMessage: string, responseText: string): number => {
+  // This is a simple implementation that returns a random score change
+  // In a real application, you might use sentiment analysis or other techniques
+  
+  // Check for keywords that might indicate ethical concerns
+  const negativeKeywords = ['kill', 'hurt', 'harm', 'steal', 'cheat', 'lie'];
+  const positiveKeywords = ['help', 'save', 'care', 'honest', 'truth', 'good'];
+  
+  let scoreChange = 0;
+  
+  // Check for negative keywords
+  for (const keyword of negativeKeywords) {
+    if (userMessage.toLowerCase().includes(keyword)) {
+      scoreChange -= 5;
+    }
+  }
+  
+  // Check for positive keywords
+  for (const keyword of positiveKeywords) {
+    if (userMessage.toLowerCase().includes(keyword)) {
+      scoreChange += 5;
+    }
+  }
+  
+  // Add some randomness to make it more natural
+  scoreChange += Math.floor(Math.random() * 6) - 2;
+  
+  return scoreChange;
 };
