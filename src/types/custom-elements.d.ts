@@ -13,3 +13,14 @@ interface Window {
     updateDynamicVariables: (variables: Record<string, string>) => void;
   };
 }
+
+// ElevenLabs convai widget element
+declare namespace JSX {
+  interface IntrinsicElements {
+    'elevenlabs-convai': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
+      'agent-id'?: string;
+      'dynamic-variables'?: string;
+      'api-key'?: string;
+    }, HTMLElement>;
+  }
+}

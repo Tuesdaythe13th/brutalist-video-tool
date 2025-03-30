@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 
@@ -15,6 +15,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
   const [isWidgetInitialized, setIsWidgetInitialized] = useState<boolean>(false);
+  const widgetRef = useRef<HTMLDivElement>(null);
   
   // Check for stored API key on component mount
   useEffect(() => {
@@ -25,59 +26,66 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   }, []);
 
-  // Initialize widget when API key is provided
+  // Handle widget initialization and updates
   useEffect(() => {
-    if (!showApiKeyInput && apiKey && !isWidgetInitialized) {
-      try {
-        // Check if the ElevenLabs widget script is loaded
-        if (window.ElevenLabsWidget) {
-          // Initialize widget with provided API key
-          window.ElevenLabsWidget.init({
-            apiKey: apiKey,
-            agentId: "5xmHawj3HdrruGcviH3Y",
-            dynamicVariables: {
+    if (!showApiKeyInput && apiKey) {
+      // Create the widget element if it doesn't exist yet
+      if (!isWidgetInitialized) {
+        try {
+          // Check if widget container exists
+          if (widgetRef.current) {
+            // Clear any existing widgets
+            widgetRef.current.innerHTML = '';
+            
+            // Create the widget element
+            const widgetElement = document.createElement('elevenlabs-convai');
+            widgetElement.setAttribute('agent-id', '5xmHawj3HdrruGcviH3Y');
+            
+            // Set dynamic variables
+            const dynamicVars = {
               current_ethical_score: ethicalScore.toString(),
               current_weather_state: weatherState
-            }
-          });
-          setIsWidgetInitialized(true);
+            };
+            widgetElement.setAttribute('dynamic-variables', JSON.stringify(dynamicVars));
+            
+            // Set API key
+            widgetElement.setAttribute('api-key', apiKey);
+            
+            // Append to container
+            widgetRef.current.appendChild(widgetElement);
+            setIsWidgetInitialized(true);
+            
+            toast({
+              title: "ElevenLabs Widget Initialized",
+              description: "Luigi Lore widget is now ready!",
+            });
+          }
+        } catch (error) {
+          console.error("Error initializing ElevenLabs widget:", error);
           toast({
-            title: "ElevenLabs Widget Initialized",
-            description: "Luigi Lore widget is now ready!",
-          });
-        } else {
-          console.error("ElevenLabs widget script is not loaded");
-          toast({
-            title: "Widget Script Not Found",
-            description: "ElevenLabs widget script could not be loaded.",
+            title: "Widget Initialization Failed",
+            description: "There was an error initializing the ElevenLabs widget.",
             variant: "destructive",
           });
+          setShowApiKeyInput(true);
         }
-      } catch (error) {
-        console.error("Error initializing ElevenLabs widget:", error);
-        toast({
-          title: "Widget Initialization Failed",
-          description: "There was an error initializing the ElevenLabs widget.",
-          variant: "destructive",
-        });
-        setShowApiKeyInput(true);
+      } else {
+        // Update dynamic variables if widget is already initialized
+        if (widgetRef.current && widgetRef.current.firstChild) {
+          try {
+            const widgetElement = widgetRef.current.firstChild as HTMLElement;
+            const dynamicVars = {
+              current_ethical_score: ethicalScore.toString(),
+              current_weather_state: weatherState
+            };
+            widgetElement.setAttribute('dynamic-variables', JSON.stringify(dynamicVars));
+          } catch (error) {
+            console.error("Failed to update widget dynamic variables:", error);
+          }
+        }
       }
     }
   }, [showApiKeyInput, apiKey, isWidgetInitialized, ethicalScore, weatherState]);
-
-  // Update dynamic variables when props change
-  useEffect(() => {
-    if (isWidgetInitialized && window.ElevenLabsWidget) {
-      try {
-        window.ElevenLabsWidget.updateDynamicVariables({
-          current_ethical_score: ethicalScore.toString(),
-          current_weather_state: weatherState,
-        });
-      } catch (error) {
-        console.error("Failed to update widget dynamic variables:", error);
-      }
-    }
-  }, [ethicalScore, weatherState, isWidgetInitialized]);
 
   const initializeWidget = () => {
     if (!apiKey) {
@@ -105,8 +113,8 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
 
   const removeWidget = () => {
     try {
-      if (window.ElevenLabsWidget) {
-        window.ElevenLabsWidget.destroy();
+      if (widgetRef.current) {
+        widgetRef.current.innerHTML = '';
         setIsWidgetInitialized(false);
       }
       setShowApiKeyInput(true);
@@ -190,23 +198,21 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         </ul>
       </div>
 
-      {/* This is where the widget will appear (it's injected by their script) */}
-      <div id="eleven-labs-widget-target"></div>
+      {/* Widget container */}
+      <div id="eleven-labs-widget-target" ref={widgetRef}></div>
     </div>
   );
 };
 
 // Add TypeScript type declaration for the ElevenLabs widget
 declare global {
-  interface Window {
-    ElevenLabsWidget?: {
-      init: (options: { 
-        apiKey: string; 
-        agentId: string;
-        dynamicVariables?: Record<string, string>;
-      }) => void;
-      destroy: () => void;
-      updateDynamicVariables: (variables: Record<string, string>) => void;
-    };
+  namespace JSX {
+    interface IntrinsicElements {
+      'elevenlabs-convai': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
+        'agent-id'?: string;
+        'dynamic-variables'?: string;
+        'api-key'?: string;
+      }, HTMLElement>;
+    }
   }
 }
