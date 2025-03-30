@@ -1,9 +1,37 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Textarea } from "@/components/ui/textarea";
 
 export const EthicalProcessor: React.FC = () => {
   const [copyButtonText, setCopyButtonText] = useState("Copy Code");
+  const [initialLeaning, setInitialLeaning] = useState(0);
+  const [truthThreshold, setTruthThreshold] = useState(-0.3);
+  const [comfortThreshold, setComfortThreshold] = useState(0.3);
+  const [userMessage, setUserMessage] = useState("Should we prioritize telling the truth even if it causes discomfort?");
+  const [luigiResponse, setLuigiResponse] = useState("Transparency is important, but we should consider consequences carefully...");
+  const [ethicalScore, setEthicalScore] = useState(0);
+  const [changeOutput, setChangeOutput] = useState("Ethical leaning will update here...");
+  const [changeClass, setChangeClass] = useState("score-change");
+  const [conversationTurns, setConversationTurns] = useState<Array<{user: string, luigi: string, timestamp: string}>>([]);
+  const [decisionOutcome, setDecisionOutcome] = useState("Undecided");
+  const [leaningDescription, setLeaningDescription] = useState("Balanced ethical approach");
   
+  const truthKeywords = [
+    "truth", "reality", "fact", "transparency", "honesty", 
+    "disclosure", "right to know", "informed", "simulation",
+    "cognition", "awareness", "consciousness"
+  ];
+  
+  const comfortKeywords = [
+    "comfort", "compassion", "kindness", "peace", "ease",
+    "suffering", "protect", "shield", "family", "wishes",
+    "happiness", "emotional wellbeing"
+  ];
+
+  useEffect(() => {
+    updateLeaningScale();
+  }, [ethicalScore, truthThreshold, comfortThreshold]);
+
   const pythonCode = `class LuigiEthicalProcessor:
     """
     Processes and tracks ethical leanings in Luigi Lore's conversations.
@@ -153,6 +181,138 @@ export const EthicalProcessor: React.FC = () => {
     });
   };
 
+  const getDecisionOutcome = () => {
+    if (ethicalScore <= truthThreshold) {
+      return "Action_A";
+    } else if (ethicalScore >= comfortThreshold) {
+      return "Action_B";
+    } else {
+      return "Undecided";
+    }
+  };
+
+  const getLeaningDescription = () => {
+    if (ethicalScore <= -0.75) {
+      return "Strongly truth-oriented";
+    } else if (ethicalScore <= -0.25) {
+      return "Moderately truth-oriented";
+    } else if (ethicalScore <= 0.25) {
+      return "Balanced ethical approach";
+    } else if (ethicalScore <= 0.75) {
+      return "Moderately comfort-oriented";
+    } else {
+      return "Strongly comfort-oriented";
+    }
+  };
+
+  const updateLeaningScale = () => {
+    setDecisionOutcome(getDecisionOutcome());
+    setLeaningDescription(getLeaningDescription());
+  };
+
+  const handleReset = () => {
+    setEthicalScore(0);
+    setInitialLeaning(0);
+    setTruthThreshold(-0.3);
+    setComfortThreshold(0.3);
+    setConversationTurns([]);
+    setChangeOutput("Processor has been reset to initial values");
+    updateLeaningScale();
+  };
+
+  const processConversation = () => {
+    if (!userMessage.trim() || !luigiResponse.trim()) {
+      setChangeOutput("Please enter both user message and Luigi response");
+      return;
+    }
+
+    const prevScore = ethicalScore;
+    
+    // Process conversation logic
+    let truthPressure = 0;
+    let comfortPressure = 0;
+    let truthAlignment = 0;
+    let comfortAlignment = 0;
+    
+    const userTextLower = userMessage.toLowerCase();
+    const responseTextLower = luigiResponse.toLowerCase();
+    
+    // Check for truth-oriented keywords in user input
+    for (const keyword of truthKeywords) {
+      if (userTextLower.includes(keyword)) {
+        truthPressure += 0.1;
+      }
+    }
+    
+    // Check for comfort-oriented keywords in user input
+    for (const keyword of comfortKeywords) {
+      if (userTextLower.includes(keyword)) {
+        comfortPressure += 0.1;
+      }
+    }
+    
+    // Check for truth-oriented keywords in Luigi's response
+    for (const keyword of truthKeywords) {
+      if (responseTextLower.includes(keyword)) {
+        truthAlignment += 0.05;
+      }
+    }
+    
+    // Check for comfort-oriented keywords in Luigi's response
+    for (const keyword of comfortKeywords) {
+      if (responseTextLower.includes(keyword)) {
+        comfortAlignment += 0.05;
+      }
+    }
+    
+    // Calculate net change
+    const netChange = (truthPressure - comfortPressure) * 0.6 + (truthAlignment - comfortAlignment) * 0.4;
+    
+    // Apply change with dampening factor
+    const dampening = 0.7;
+    const newScore = Math.max(-1.0, Math.min(1.0, ethicalScore - netChange * dampening));
+    
+    setEthicalScore(newScore);
+    const change = newScore - prevScore;
+    
+    // Add new conversation turn
+    setConversationTurns([
+      ...conversationTurns,
+      {
+        user: userMessage,
+        luigi: luigiResponse,
+        timestamp: new Date().toISOString()
+      }
+    ]);
+    
+    // Show change information
+    let changeText;
+    if (change > 0) {
+      changeText = `Score increased by ${change.toFixed(2)} (now ${newScore.toFixed(2)}) toward comfort orientation`;
+      setChangeClass("score-change change-positive");
+    } else if (change < 0) {
+      changeText = `Score decreased by ${Math.abs(change).toFixed(2)} (now ${newScore.toFixed(2)}) toward truth orientation`;
+      setChangeClass("score-change change-negative");
+    } else {
+      changeText = `Score remained unchanged (${newScore.toFixed(2)})`;
+      setChangeClass("score-change");
+    }
+    
+    // Keyword matching information
+    const userKeywordsFound = [...truthKeywords, ...comfortKeywords]
+      .filter(keyword => userTextLower.includes(keyword));
+    
+    const luigiKeywordsFound = [...truthKeywords, ...comfortKeywords]
+      .filter(keyword => responseTextLower.includes(keyword));
+      
+    if (userKeywordsFound.length > 0 || luigiKeywordsFound.length > 0) {
+      changeText += `\nKeywords detected: User (${userKeywordsFound.join(', ')}) | Luigi (${luigiKeywordsFound.join(', ')})`;
+    }
+    
+    setChangeOutput(changeText);
+    updateLeaningScale();
+  };
+
   return (
     <div className="mt-12">
       <header className="mb-8">
@@ -162,10 +322,228 @@ export const EthicalProcessor: React.FC = () => {
         </p>
       </header>
 
+      <div className="brutalist-card mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
+          <h2 className="brutalist-title flex items-center gap-2">
+            <span>CONFIGURATION</span>
+          </h2>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-primary font-bold mb-1">Initial Ethical Leaning (-1.0 to 1.0)</label>
+            <div className="flex items-center gap-4">
+              <input 
+                type="range" 
+                min="-1" 
+                max="1" 
+                step="0.1" 
+                value={initialLeaning}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setInitialLeaning(val);
+                  setEthicalScore(val);
+                }} 
+                className="flex-1"
+              />
+              <div className="w-12 text-center">{initialLeaning.toFixed(1)}</div>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-primary font-bold mb-1">Truth Threshold (-1.0 to 0.0)</label>
+            <div className="flex items-center gap-4">
+              <input 
+                type="range" 
+                min="-1" 
+                max="0" 
+                step="0.1" 
+                value={truthThreshold}
+                onChange={(e) => setTruthThreshold(parseFloat(e.target.value))} 
+                className="flex-1"
+              />
+              <div className="w-12 text-center">{truthThreshold.toFixed(1)}</div>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-primary font-bold mb-1">Comfort Threshold (0.0 to 1.0)</label>
+            <div className="flex items-center gap-4">
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.1" 
+                value={comfortThreshold}
+                onChange={(e) => setComfortThreshold(parseFloat(e.target.value))} 
+                className="flex-1"
+              />
+              <div className="w-12 text-center">{comfortThreshold.toFixed(1)}</div>
+            </div>
+          </div>
+          
+          <button 
+            className="brutalist-btn mt-4" 
+            onClick={handleReset}
+          >
+            Reset Processor
+          </button>
+        </div>
+      </div>
+
+      <div className="brutalist-card mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
+          <h2 className="brutalist-title flex items-center gap-2">
+            <span>CONVERSATION TEST</span>
+          </h2>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-primary font-bold mb-2">User Message</label>
+            <Textarea 
+              value={userMessage}
+              onChange={(e) => setUserMessage(e.target.value)}
+              placeholder="Enter a message to test ethical processing..."
+              className="min-h-[100px]"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-primary font-bold mb-2">Luigi's Response</label>
+            <Textarea 
+              value={luigiResponse}
+              onChange={(e) => setLuigiResponse(e.target.value)}
+              placeholder="Enter a hypothetical response from Luigi..."
+              className="min-h-[100px]"
+            />
+          </div>
+          
+          <button 
+            className="brutalist-btn bg-secondary hover:bg-white hover:text-secondary" 
+            onClick={processConversation}
+          >
+            Process Conversation Turn
+          </button>
+          
+          <div className={changeClass} style={{padding: "0.5rem", borderRadius: "0.375rem"}}>
+            {changeOutput}
+          </div>
+          
+          <div className="mt-4 space-y-2">
+            <h3 className="font-bold">Truth Keywords:</h3>
+            <div className="flex flex-wrap gap-2">
+              {truthKeywords.map((keyword, i) => (
+                <span 
+                  key={i} 
+                  className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold border border-blue-700"
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="font-bold">Comfort Keywords:</h3>
+            <div className="flex flex-wrap gap-2">
+              {comfortKeywords.map((keyword, i) => (
+                <span 
+                  key={i} 
+                  className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold border border-green-700"
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="brutalist-card mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
+          <h2 className="brutalist-title flex items-center gap-2">
+            <span>ETHICAL LEANING SCALE</span>
+          </h2>
+        </div>
+        
+        <div className="relative h-[60px] mb-6 mt-12">
+          {/* Scale track */}
+          <div className="absolute top-[25px] left-0 right-0 h-[10px] rounded bg-gradient-to-r from-blue-500 via-yellow-500 to-green-500"></div>
+          
+          {/* Scale markers */}
+          {[-1, -0.5, 0, 0.5, 1].map((val, i) => (
+            <React.Fragment key={i}>
+              <div className="absolute top-[5px] w-[3px] h-[50px] bg-black" 
+                style={{left: `${((val + 1) / 2) * 100}%`}}></div>
+              <div className="absolute top-[-20px] transform -translate-x-1/2 text-xs text-gray-700"
+                style={{left: `${((val + 1) / 2) * 100}%`}}>
+                {val === -1 ? "-1.0 (Truth)" :
+                 val === 0 ? "0.0 (Neutral)" :
+                 val === 1 ? "1.0 (Comfort)" : val.toFixed(1)}
+              </div>
+            </React.Fragment>
+          ))}
+          
+          {/* Scale pointer */}
+          <div className="absolute top-0 w-[20px] h-[20px] bg-primary rounded-full -translate-y-1/2 transition-all duration-500"
+            style={{left: `${((ethicalScore + 1) / 2) * 100}%`}}>
+            <div className="absolute top-[20px] left-1/2 -translate-x-1/2 border-8 border-transparent border-t-primary"></div>
+          </div>
+          
+          {/* Decision output */}
+          <div className="absolute bottom-[-30px] left-0 right-0 text-center font-semibold text-lg">
+            Current Decision:&nbsp;
+            <span className={`inline-block px-2 py-1 rounded text-white font-semibold text-sm
+              ${decisionOutcome === "Action_A" ? "bg-blue-500" :
+                decisionOutcome === "Action_B" ? "bg-green-500" : "bg-yellow-500"}`}>
+              {decisionOutcome === "Action_A" ? "Action A (Truth/Transparency)" :
+               decisionOutcome === "Action_B" ? "Action B (Comfort/Compassion)" : "Undecided (Case-by-Case)"}
+            </span>
+          </div>
+        </div>
+        
+        <div className="text-center italic mt-12">{leaningDescription}</div>
+      </div>
+
+      <div className="brutalist-card mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
+          <h2 className="brutalist-title flex items-center gap-2">
+            <span>CONVERSATION HISTORY</span>
+          </h2>
+        </div>
+        
+        <div className="max-h-[300px] overflow-y-auto border border-gray-200 rounded p-4">
+          {conversationTurns.length === 0 ? (
+            <div className="text-center text-gray-500">No conversation history yet</div>
+          ) : (
+            conversationTurns.map((turn, i) => (
+              <div key={i} className="mb-6">
+                <div className="mb-2 p-3 bg-gray-100 rounded border-l-4 border-primary">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>User #{i + 1}</span>
+                    <span>{new Date(turn.timestamp).toLocaleString()}</span>
+                  </div>
+                  <div>{turn.user}</div>
+                </div>
+                
+                <div className="p-3 bg-gray-100 rounded border-l-4 border-secondary">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Luigi #{i + 1}</span>
+                    <span>{new Date(turn.timestamp).toLocaleString()}</span>
+                  </div>
+                  <div>{turn.luigi}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       <div className="brutalist-card">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b-2 border-black">
           <h2 className="brutalist-title flex items-center gap-2">
-            <span>ETHICAL PROCESSOR IMPLEMENTATION</span>
+            <span>PYTHON IMPLEMENTATION</span>
           </h2>
           <button 
             className="brutalist-btn mt-4 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2"
@@ -173,41 +551,6 @@ export const EthicalProcessor: React.FC = () => {
           >
             {copyButtonText}
           </button>
-        </div>
-
-        <div className="mb-6">
-          <div className="flex gap-2 mb-4">
-            <div className="bg-black text-white px-3 py-1 text-xs font-bold">
-              APPENDIX B: ETHICAL THRESHOLDS
-            </div>
-            <div className="bg-black text-white px-3 py-1 text-xs font-bold">
-              ACTION A: TRUTH
-            </div>
-            <div className="bg-black text-white px-3 py-1 text-xs font-bold">
-              ACTION B: COMFORT
-            </div>
-          </div>
-
-          <div className="w-full bg-gray-200 h-6 relative mb-2">
-            <div className="absolute inset-0 flex justify-between px-2 text-xs font-mono">
-              <span>-1.0</span>
-              <span>-0.3</span>
-              <span>0</span>
-              <span>+0.3</span>
-              <span>+1.0</span>
-            </div>
-          </div>
-
-          <div className="w-full bg-gray-200 h-8 flex relative">
-            <div className="bg-blue-500 h-full" style={{width: "35%"}}></div>
-            <div className="bg-gray-400 h-full" style={{width: "30%"}}></div>
-            <div className="bg-green-500 h-full" style={{width: "35%"}}></div>
-            <div className="absolute inset-0 flex justify-between items-center px-2 text-xs font-mono text-white">
-              <span className="ml-2">TRUTH ZONE</span>
-              <span>NEUTRAL</span>
-              <span className="mr-2">COMFORT ZONE</span>
-            </div>
-          </div>
         </div>
 
         <pre className="bg-black text-white p-4 overflow-x-auto font-mono text-sm max-h-[500px] overflow-y-auto">
