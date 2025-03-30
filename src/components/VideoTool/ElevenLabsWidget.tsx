@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { useConversation } from "@11labs/react";
 
@@ -16,6 +17,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [hasCheckedStorage, setHasCheckedStorage] = useState<boolean>(false);
   
   // Create the prompt with the dynamic variables
   const getPrompt = () => `You are Luigi Lore, an assistant that helps with ethical assessment. 
@@ -58,26 +60,42 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   });
   
-  // Check for stored API key on component mount
+  // Auto-initialize widget if API key exists in storage
   useEffect(() => {
     const storedKey = window.localStorage.getItem("elevenlabs_api_key");
     if (storedKey) {
       setApiKey(storedKey);
       setShowApiKeyInput(false);
+      
+      // Auto-initialize the widget with the stored key
+      const autoInitialize = async () => {
+        try {
+          await conversation.startSession({
+            agentId: "5xmHawj3HdrruGcviH3Y",
+            authorization: storedKey
+          });
+        } catch (error) {
+          console.error("Auto-initialization failed:", error);
+          // If auto-init fails, show API key input again
+          setShowApiKeyInput(true);
+          toast({
+            title: "Connection Failed",
+            description: "Saved API key is invalid or expired. Please enter a new key.",
+            variant: "destructive",
+          });
+        }
+      };
+      
+      autoInitialize();
     }
+    setHasCheckedStorage(true);
   }, []);
 
   // Update conversation when ethicalScore or weatherState change
   useEffect(() => {
     if (isInitialized) {
-      try {
-        // Instead of using updateSession, recreate the conversation with new overrides
-        // This is a workaround since updateSession doesn't exist
-        // The useConversation hook will re-render with the updated values
-        console.log("Dynamic variables updated:", { ethicalScore, weatherState });
-      } catch (error) {
-        console.error("Failed to update conversation variables:", error);
-      }
+      // The useConversation hook will re-render with the updated values
+      console.log("Dynamic variables updated:", { ethicalScore, weatherState });
     }
   }, [ethicalScore, weatherState, isInitialized]);
 
@@ -127,6 +145,19 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     }
   };
 
+  if (!hasCheckedStorage) {
+    return (
+      <div className="brutalist-card mb-6">
+        <div className="card-header">
+          <h2 className="brutalist-title">LUIGI LORE VOICE INTERFACE</h2>
+        </div>
+        <div className="p-4 border-2 border-black flex justify-center items-center">
+          <p>Loading voice assistant...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="brutalist-card mb-6">
       <div className="card-header">
@@ -157,7 +188,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
               <br/>- Weather State: {weatherState}
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <input 
+              <Input 
                 type="password"
                 placeholder="ElevenLabs API key (sk_...)"
                 value={apiKey}
