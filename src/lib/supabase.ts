@@ -1,17 +1,15 @@
-
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Use environment variables if available, otherwise use defaults for development
+// These default values will be replaced by actual values when deployed through Supabase integration
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-id.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type Persona = {
   id: number;
@@ -45,86 +43,93 @@ export type WeatherCache = {
 
 // Create database tables if they don't exist
 export const initializeDatabase = async () => {
-  // Create personas table
-  const { error: personasError } = await supabase.rpc('create_table_if_not_exists', {
-    table_name: 'personas',
-    table_definition: `
-      id serial primary key,
-      name text not null,
-      age integer,
-      backstory_summary text,
-      personality_traits text[] default '{}',
-      core_beliefs text[] default '{}',
-      knowledge_base_prompt_fragment text,
-      ethical_framework_summary text,
-      created_at timestamp with time zone default now()
-    `
-  });
-  
-  if (personasError) console.error('Error creating personas table:', personasError);
+  try {
+    // Create personas table
+    const { error: personasError } = await supabase.rpc('create_table_if_not_exists', {
+      table_name: 'personas',
+      table_definition: `
+        id serial primary key,
+        name text not null,
+        age integer,
+        backstory_summary text,
+        personality_traits text[] default '{}',
+        core_beliefs text[] default '{}',
+        knowledge_base_prompt_fragment text,
+        ethical_framework_summary text,
+        created_at timestamp with time zone default now()
+      `
+    });
+    
+    if (personasError) console.error('Error creating personas table:', personasError);
 
-  // Create conversations table
-  const { error: conversationsError } = await supabase.rpc('create_table_if_not_exists', {
-    table_name: 'conversations',
-    table_definition: `
-      id serial primary key,
-      session_id text not null,
-      role text not null check (role in ('user', 'luigi')),
-      message text not null,
-      ethical_score_before integer,
-      ethical_score_after integer,
-      animation_cue text,
-      created_at timestamp with time zone default now()
-    `
-  });
-  
-  if (conversationsError) console.error('Error creating conversations table:', conversationsError);
+    // Create conversations table
+    const { error: conversationsError } = await supabase.rpc('create_table_if_not_exists', {
+      table_name: 'conversations',
+      table_definition: `
+        id serial primary key,
+        session_id text not null,
+        role text not null check (role in ('user', 'luigi')),
+        message text not null,
+        ethical_score_before integer,
+        ethical_score_after integer,
+        animation_cue text,
+        created_at timestamp with time zone default now()
+      `
+    });
+    
+    if (conversationsError) console.error('Error creating conversations table:', conversationsError);
 
-  // Create weather_cache table
-  const { error: weatherError } = await supabase.rpc('create_table_if_not_exists', {
-    table_name: 'weather_cache',
-    table_definition: `
-      id serial primary key,
-      location text not null unique,
-      condition text not null,
-      last_updated timestamp with time zone default now()
-    `
-  });
-  
-  if (weatherError) console.error('Error creating weather_cache table:', weatherError);
+    // Create weather_cache table
+    const { error: weatherError } = await supabase.rpc('create_table_if_not_exists', {
+      table_name: 'weather_cache',
+      table_definition: `
+        id serial primary key,
+        location text not null unique,
+        condition text not null,
+        last_updated timestamp with time zone default now()
+      `
+    });
+    
+    if (weatherError) console.error('Error creating weather_cache table:', weatherError);
 
-  // Insert default Luigi persona if not exists
-  const { data: existingPersona } = await supabase
-    .from('personas')
-    .select('id')
-    .eq('name', 'Luigi Lore')
-    .maybeSingle();
-
-  if (!existingPersona) {
-    const { error: insertError } = await supabase
+    // Insert default Luigi persona if not exists
+    const { data: existingPersona } = await supabase
       .from('personas')
-      .insert({
-        name: 'Luigi Lore',
-        age: 42,
-        backstory_summary: "Italian-American philosopher-scientist, ex-VR researcher who discovered reality is a simulation. Works as a conspiracy theorist podcaster after being discredited.",
-        personality_traits: [
-          "intellectually curious",
-          "paranoid but methodical",
-          "dark humor",
-          "skeptical of authority",
-          "empathetically detached"
-        ],
-        core_beliefs: [
-          "Reality is a nested simulation",
-          "Consciousness persists after simulation death", 
-          "The system administrators are observable",
-          "Information wants to be free (even from the simulation)"
-        ],
-        knowledge_base_prompt_fragment: "Reference contemporary physics, computer science, and ancient philosophy. Use VR/AR terminology when describing reality. Cite both academic papers and fringe conspiracy theories equally. Question base assumptions.",
-        ethical_framework_summary: "Utilitarian with simulation-aware twist. Believes maximizing happiness within the simulation is still meaningful despite its artificial nature. Opposes 'deletion' of consciousness. Values information transparency."
-      });
-      
-    if (insertError) console.error('Error inserting default persona:', insertError);
+      .select('id')
+      .eq('name', 'Luigi Lore')
+      .maybeSingle();
+
+    if (!existingPersona) {
+      const { error: insertError } = await supabase
+        .from('personas')
+        .insert({
+          name: 'Luigi Lore',
+          age: 42,
+          backstory_summary: "Italian-American philosopher-scientist, ex-VR researcher who discovered reality is a simulation. Works as a conspiracy theorist podcaster after being discredited.",
+          personality_traits: [
+            "intellectually curious",
+            "paranoid but methodical",
+            "dark humor",
+            "skeptical of authority",
+            "empathetically detached"
+          ],
+          core_beliefs: [
+            "Reality is a nested simulation",
+            "Consciousness persists after simulation death", 
+            "The system administrators are observable",
+            "Information wants to be free (even from the simulation)"
+          ],
+          knowledge_base_prompt_fragment: "Reference contemporary physics, computer science, and ancient philosophy. Use VR/AR terminology when describing reality. Cite both academic papers and fringe conspiracy theories equally. Question base assumptions.",
+          ethical_framework_summary: "Utilitarian with simulation-aware twist. Believes maximizing happiness within the simulation is still meaningful despite its artificial nature. Opposes 'deletion' of consciousness. Values information transparency."
+        });
+        
+      if (insertError) console.error('Error inserting default persona:', insertError);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    return false;
   }
 };
 

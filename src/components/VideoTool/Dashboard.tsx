@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/use-toast";
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [dbInitialized, setDbInitialized] = useState(false);
   const [evalData, setEvalData] = useState({
     mistralLatency: "--",
     llamaLatency: "--",
@@ -25,12 +26,26 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const setupDatabase = async () => {
       try {
-        await initializeDatabase();
+        const success = await initializeDatabase();
+        setDbInitialized(success);
+        
+        if (success) {
+          toast({
+            title: "Database Initialized",
+            description: "Successfully connected to Supabase and initialized database.",
+          });
+        } else {
+          toast({
+            title: "Database Initialization Warning",
+            description: "Connected to Supabase, but some database operations may have failed. Check console for details.",
+            variant: "destructive"
+          });
+        }
       } catch (error) {
         console.error("Failed to initialize database:", error);
         toast({
           title: "Database Initialization Failed",
-          description: "Could not connect to Supabase. Some features may not work correctly.",
+          description: "Could not connect to Supabase. Some features may not work correctly. Please check your Supabase connection.",
           variant: "destructive"
         });
       }
@@ -71,6 +86,11 @@ export const Dashboard: React.FC = () => {
         <p className="text-center uppercase text-secondary">
           COMPARING MISTRAL-7B-INSTRUCT-V0.2 AND LLAMA-3-8B-INSTRUCT
         </p>
+        {!dbInitialized && (
+          <p className="text-center text-red-500 mt-2">
+            ⚠️ Database connection issue - Some features may not work correctly
+          </p>
+        )}
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
