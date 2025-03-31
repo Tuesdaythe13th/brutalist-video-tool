@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useConversation } from '@11labs/react';
 
 interface ElevenLabsWidgetProps {
@@ -17,16 +17,6 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
     onDisconnect: () => console.log('Disconnected from ElevenLabs agent'),
     onError: (error) => console.error('ElevenLabs agent error:', error),
   });
-
-  // Update dynamic variables effect
-  useEffect(() => {
-    if (conversation.status === 'connected') {
-      conversation.updateDynamicVariables({
-        ethical_score: ethicalScore.toString(),
-        weather_state: weatherState
-      });
-    }
-  }, [ethicalScore, weatherState, conversation]);
 
   const startConversation = async () => {
     try {
