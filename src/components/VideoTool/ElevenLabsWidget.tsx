@@ -1,46 +1,77 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from '@11labs/client';
+import { toast } from "@/components/ui/use-toast";
 
-interface ElevenLabsWidgetProps {
-  ethicalScore: number;
-  weatherState: string;
-}
-
-export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({ 
-  ethicalScore, 
-  weatherState 
-}) => {
+export const ElevenLabsWidget: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [agentMode, setAgentMode] = useState<string>("listening");
+  const [isLoading, setIsLoading] = useState(false);
   const conversationRef = useRef<any>(null);
   
-  // API key directly included for sandbox environment
-  const API_KEY = "sk_341c45c68a487824abf467168934962e0e301f3a0e303cc0";
+  // Use a constant for the agent ID
   const AGENT_ID = "5xmHawj3HdrruGcviH3Y";
   
   const startConversation = async () => {
     try {
+      setIsLoading(true);
+      
       // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Start the conversation
+      // The URL for the backend API should be configured in the environment
+      // For development purposes, we'll use a default URL if not set
+      const backendUrl = "https://api.elevenlabs.io/v1/convai/conversation/get_signed_url";
+      
+      console.log(`Fetching signed URL for agent: ${AGENT_ID}`);
+      
+      // Make a direct request to ElevenLabs API
+      // This should be replaced with a backend call in production
+      const response = await fetch(`${backendUrl}?agent_id=${AGENT_ID}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch signed URL: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const signedUrl = data.signed_url;
+
+      if (!signedUrl) {
+        throw new Error("Received empty signed URL");
+      }
+
+      console.log("Successfully received signed URL");
+      
+      // Start the conversation using the signed URL
       conversationRef.current = await Conversation.startSession({
-        agentId: AGENT_ID,
-        dynamicVariables: {
-          ethical_score: ethicalScore.toString(),
-          weather_state: weatherState
-        },
+        signedUrl: signedUrl,
         onConnect: () => {
           setIsConnected(true);
+          setIsLoading(false);
           console.log("Connected to ElevenLabs agent");
+          toast({
+            title: "Connected",
+            description: "Successfully connected to the ElevenLabs agent",
+          });
         },
         onDisconnect: () => {
           setIsConnected(false);
           console.log("Disconnected from ElevenLabs agent");
+          toast({
+            title: "Disconnected",
+            description: "Disconnected from the ElevenLabs agent",
+            variant: "destructive"
+          });
         },
         onError: (error) => {
           console.error("ElevenLabs conversation error:", error);
+          setIsLoading(false);
+          toast({
+            title: "Error",
+            description: "An error occurred with the ElevenLabs conversation",
+            variant: "destructive"
+          });
         },
         onModeChange: (mode) => {
           setAgentMode(mode.mode);
@@ -49,31 +80,35 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       });
     } catch (error) {
       console.error("Failed to start ElevenLabs conversation:", error);
+      setIsLoading(false);
+      toast({
+        title: "Connection Failed",
+        description: "Could not connect to ElevenLabs. Please try again later.",
+        variant: "destructive"
+      });
     }
   };
 
   const stopConversation = async () => {
     if (conversationRef.current) {
-      await conversationRef.current.endSession();
-      conversationRef.current = null;
-      console.log("Conversation ended");
+      try {
+        await conversationRef.current.endSession();
+        conversationRef.current = null;
+        console.log("Conversation ended");
+        toast({
+          title: "Conversation Ended",
+          description: "The conversation has been ended successfully",
+        });
+      } catch (error) {
+        console.error("Error ending conversation:", error);
+        toast({
+          title: "Error",
+          description: "Failed to end the conversation properly",
+          variant: "destructive"
+        });
+      }
     }
   };
-
-  // Update dynamic variables when props change
-  useEffect(() => {
-    if (conversationRef.current && isConnected) {
-      console.log("Updating dynamic variables:", { 
-        ethical_score: ethicalScore.toString(), 
-        weather_state: weatherState 
-      });
-      
-      conversationRef.current.updateDynamicVariables({
-        ethical_score: ethicalScore.toString(),
-        weather_state: weatherState
-      });
-    }
-  }, [ethicalScore, weatherState, isConnected]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -95,10 +130,10 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         <div className="mb-4">
           <button 
             onClick={startConversation}
-            disabled={isConnected}
+            disabled={isConnected || isLoading}
             className="px-4 py-2 bg-blue-500 text-white rounded mr-2 disabled:bg-blue-300"
           >
-            Start Conversation
+            {isLoading ? "Connecting..." : "Start Conversation"}
           </button>
           <button 
             onClick={stopConversation}
@@ -113,14 +148,23 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           <p>Status: <span className={isConnected ? "text-green-600" : "text-red-600"}>
             {isConnected ? "Connected" : "Disconnected"}
           </span></p>
-          <p>Agent is <span className="font-medium">{agentMode}</span></p>
+          {isConnected && <p>Agent is <span className="font-medium">{agentMode}</span></p>}
         </div>
         
-        {!isConnected && (
+        {!isConnected && !isLoading && (
           <div className="text-center mt-4">
             <p>Click "Start Conversation" to activate Luigi Digital Twin</p>
             <p className="text-sm text-gray-500 mt-2">
-              Current ethical score: {ethicalScore}, Weather: {weatherState}
+              This will request microphone access to enable voice interaction.
+            </p>
+          </div>
+        )}
+        
+        {isLoading && (
+          <div className="text-center mt-4">
+            <p>Connecting to ElevenLabs...</p>
+            <p className="text-sm text-gray-500 mt-2">
+              This may take a few moments
             </p>
           </div>
         )}
