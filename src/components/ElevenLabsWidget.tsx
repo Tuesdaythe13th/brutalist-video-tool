@@ -14,7 +14,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   const [isWidgetVisible, setIsWidgetVisible] = useState(false);
   
   // API key directly included for sandbox environment
-  const API_KEY = "sk_341c45c68a487824abf467168934962e0e301f3a0e303cc0";
+  const API_KEY = "sk_341c45c68a487824abf467168934962e0e303cc0";
   const AGENT_ID = "5xmHawj3HdrruGcviH3Y";
   
   const showWidget = () => {
@@ -23,44 +23,59 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   
   const hideWidget = () => {
     setIsWidgetVisible(false);
+    // Clear the widget container
+    const container = document.getElementById('elevenlabs-widget-container');
+    if (container) {
+      container.innerHTML = '';
+    }
+    
+    // Destroy widget instance if it exists
+    if (window.ElevenLabsWidget) {
+      window.ElevenLabsWidget.destroy();
+    }
   };
   
   useEffect(() => {
-    // Initialize widget if window.ElevenLabsWidget exists and widget is visible
-    if (isWidgetVisible && window.ElevenLabsWidget) {
-      window.ElevenLabsWidget.init({
-        apiKey: API_KEY,
-        agentId: AGENT_ID,
-        dynamicVariables: {
+    // Only initialize when widget should be visible
+    if (isWidgetVisible) {
+      // Create the elevenlabs-convai element
+      const widgetContainer = document.getElementById('elevenlabs-widget-container');
+      if (widgetContainer) {
+        // Clear any existing content
+        widgetContainer.innerHTML = '';
+        
+        // Create and append the custom element
+        const widgetElement = document.createElement('elevenlabs-convai');
+        widgetElement.setAttribute('agent-id', AGENT_ID);
+        
+        // Set dynamic variables
+        const dynamicVars = {
           ethical_score: ethicalScore.toString(),
           weather_state: weatherState
-        }
-      });
+        };
+        widgetElement.setAttribute('dynamic-variables', JSON.stringify(dynamicVars));
+        
+        widgetContainer.appendChild(widgetElement);
+        
+        // Log that we're trying to add the widget
+        console.log('Adding ElevenLabs widget to container', widgetElement);
+      } else {
+        console.error('Widget container not found');
+      }
     }
     
     // Cleanup function
     return () => {
-      if (window.ElevenLabsWidget) {
+      if (isWidgetVisible && window.ElevenLabsWidget) {
         window.ElevenLabsWidget.destroy();
       }
     };
   }, [isWidgetVisible, ethicalScore, weatherState]);
   
-  // Update dynamic variables when props change
-  useEffect(() => {
-    if (isWidgetVisible && window.ElevenLabsWidget) {
-      window.ElevenLabsWidget.updateDynamicVariables({
-        ethical_score: ethicalScore.toString(),
-        weather_state: weatherState
-      });
-    }
-  }, [ethicalScore, weatherState, isWidgetVisible]);
-  
   return (
     <div className="brutalist-card elevenlabs-widget-container mb-6">
       <div className="card-header">
         <h2 className="brutalist-title">
-          <i className="fas fa-comment-dots mr-2"></i>
           LUIGI LORE DIGITAL TWIN
         </h2>
       </div>
@@ -98,11 +113,11 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
           </div>
         )}
         
-        {isWidgetVisible && (
-          <div id="elevenlabs-widget-container" className="w-full h-64">
-            {/* The ElevenLabs widget will be mounted here */}
-          </div>
-        )}
+        {/* This is where the widget will be mounted */}
+        <div 
+          id="elevenlabs-widget-container" 
+          className={`w-full ${isWidgetVisible ? 'block' : 'hidden'} h-96 border-2 border-black p-4`}
+        ></div>
       </div>
     </div>
   );
