@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from '@11labs/client';
 import { toast } from "@/components/ui/use-toast";
@@ -18,15 +19,20 @@ export const ElevenLabsWidget: React.FC = () => {
       // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // The URL for the backend API should be configured in the environment
-      // For development purposes, we'll use a default URL if not set
-      const backendUrl = "https://api.elevenlabs.io/v1/convai/conversation/get_signed_url";
+      // Get the URL for YOUR backend API route from environment variables
+      // For development purposes, we'll use a fallback URL if not set
+      const yourBackendApiUrl = import.meta.env.VITE_SIGNED_URL_ENDPOINT || "/api/get-signed-url";
       
-      console.log(`Fetching signed URL for agent: ${AGENT_ID}`);
+      console.log(`Fetching signed URL from backend: ${yourBackendApiUrl} for agent: ${AGENT_ID}`);
       
-      // Make a direct request to ElevenLabs API
-      // This should be replaced with a backend call in production
-      const response = await fetch(`${backendUrl}?agent_id=${AGENT_ID}`);
+      // Call YOUR backend API route (hosted on Vercel)
+      const response = await fetch(yourBackendApiUrl, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ agentId: AGENT_ID })
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -34,7 +40,7 @@ export const ElevenLabsWidget: React.FC = () => {
       }
 
       const data = await response.json();
-      const signedUrl = data.signed_url;
+      const signedUrl = data.signed_url || data.signedUrl;
 
       if (!signedUrl) {
         throw new Error("Received empty signed URL");
@@ -43,9 +49,10 @@ export const ElevenLabsWidget: React.FC = () => {
       console.log("Successfully received signed URL");
       
       // Start the conversation using the signed URL
-      // According to the type definition, we should use 'url' instead of 'signedUrl'
+      // Instead of using url or signedUrl property, let's check the library documentation
+      // Based on @11labs/client examples, the connection URL should be passed directly
       conversationRef.current = await Conversation.startSession({
-        url: signedUrl, // Changed from 'signedUrl' to 'url' to match the expected type
+        url: signedUrl,
         onConnect: () => {
           setIsConnected(true);
           setIsLoading(false);

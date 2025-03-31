@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
@@ -7,7 +8,7 @@ import { ConversationSystem } from "./ConversationSystem";
 import { EthicalProcessor } from "./EthicalProcessor";
 import { WeatherAPIExplorer } from "./WeatherAPIExplorer";
 import { PersonaAPI } from "./PersonaAPI";
-import { ElevenLabsWidget } from "@/components/ElevenLabsWidget";
+import { ElevenLabsWidget } from "./ElevenLabsWidget";
 import { initializeDatabase, getWeatherForLocation } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 
