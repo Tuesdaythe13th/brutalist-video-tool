@@ -25,7 +25,7 @@ export const ElevenLabsWidget: React.FC = () => {
     },
     onMessage: (message) => {
       // Handle incoming messages from the agent if needed
-      console.log('Message:', message);
+      console.log('Message received:', message);
     },
     onError: (error) => {
       console.error('Conversation Error:', error);

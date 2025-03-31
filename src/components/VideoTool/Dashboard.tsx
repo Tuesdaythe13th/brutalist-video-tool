@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
@@ -108,7 +107,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="brutalist-container">
-      {/* ElevenLabs Widget Component - now without parameters */}
+      {/* ElevenLabs Widget Component at the top of the dashboard */}
       <ElevenLabsWidget />
       
       <header className="mb-8">
