@@ -21,3 +21,21 @@ interface Window {
     updateDynamicVariables: (variables: Record<string, string>) => void;
   };
 }
+
+declare module '@11labs/client' {
+  export interface ConversationOptions {
+    agentId: string;
+    apiKey?: string;
+    dynamicVariables?: Record<string, string>;
+    onConnect?: () => void;
+    onDisconnect?: () => void;
+    onError?: (error: any) => void;
+    onModeChange?: (mode: { mode: string }) => void;
+  }
+
+  export class Conversation {
+    static startSession(options: ConversationOptions): Promise<any>;
+    endSession(): Promise<void>;
+    updateDynamicVariables(variables: Record<string, string>): void;
+  }
+}
