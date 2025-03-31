@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from '@11labs/client';
 import { toast } from "@/components/ui/use-toast";
@@ -44,8 +43,9 @@ export const ElevenLabsWidget: React.FC = () => {
       console.log("Successfully received signed URL");
       
       // Start the conversation using the signed URL
+      // According to the type definition, we should use 'url' instead of 'signedUrl'
       conversationRef.current = await Conversation.startSession({
-        signedUrl: signedUrl,
+        url: signedUrl, // Changed from 'signedUrl' to 'url' to match the expected type
         onConnect: () => {
           setIsConnected(true);
           setIsLoading(false);
