@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from '@11labs/client';
+import { Button } from "@/components/ui/button";
 
 interface ElevenLabsWidgetProps {
   ethicalScore: number;
@@ -92,21 +93,21 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       </div>
       
       <div className="p-4 bg-gray-100 min-h-[400px] flex flex-col items-center justify-center">
-        <div className="mb-4">
-          <button 
+        <div className="mb-4 space-x-4">
+          <Button 
             onClick={startConversation}
             disabled={isConnected}
-            className="px-4 py-2 bg-blue-500 text-white rounded mr-2 disabled:bg-blue-300"
+            variant="default"
           >
             Start Conversation
-          </button>
-          <button 
+          </Button>
+          <Button 
             onClick={stopConversation}
             disabled={!isConnected}
-            className="px-4 py-2 bg-red-500 text-white rounded disabled:bg-red-300"
+            variant="destructive"
           >
             Stop Conversation
-          </button>
+          </Button>
         </div>
         
         <div className="mb-4">
