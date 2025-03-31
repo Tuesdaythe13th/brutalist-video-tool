@@ -1,6 +1,5 @@
 
-import React from "react";
-import { useConversation } from '@11labs/react';
+import React, { useEffect, useRef } from "react";
 
 interface ElevenLabsWidgetProps {
   ethicalScore: number;
@@ -11,34 +10,24 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   ethicalScore, 
   weatherState 
 }) => {
-  // Use the official ElevenLabs conversation hook
-  const conversation = useConversation({
-    onConnect: () => console.log('Connected to ElevenLabs agent'),
-    onDisconnect: () => console.log('Disconnected from ElevenLabs agent'),
-    onError: (error) => console.error('ElevenLabs agent error:', error),
-  });
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const startConversation = async () => {
-    try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+  useEffect(() => {
+    // Wait for the DOM to be fully loaded
+    if (containerRef.current) {
+      // Create the elevenlabs-convai element
+      const widget = document.createElement('elevenlabs-convai');
+      widget.setAttribute('agent-id', '5xmHawj3HdrruGcviH3Y');
+      widget.setAttribute('dynamic-variables', JSON.stringify({
+        ethical_score: ethicalScore.toString(),
+        weather_state: weatherState
+      }));
       
-      // Start the conversation with your agent
-      await conversation.startSession({
-        agentId: '5xmHawj3HdrruGcviH3Y', // Your agent ID
-        dynamicVariables: {
-          ethical_score: ethicalScore.toString(),
-          weather_state: weatherState
-        }
-      });
-    } catch (error) {
-      console.error('Failed to start conversation:', error);
+      // Clear container and append the widget
+      containerRef.current.innerHTML = '';
+      containerRef.current.appendChild(widget);
     }
-  };
-
-  const stopConversation = async () => {
-    await conversation.endSession();
-  };
+  }, [ethicalScore, weatherState]);
 
   return (
     <div className="brutalist-card elevenlabs-widget-container mb-6">
@@ -48,34 +37,11 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         </h2>
       </div>
       
-      <div className="p-4 bg-gray-100 min-h-[400px] flex flex-col items-center justify-center">
-        <div className="mb-4 space-x-4">
-          <button 
-            onClick={startConversation}
-            disabled={conversation.status === 'connected'}
-            className="brutalist-btn"
-          >
-            Start Conversation
-          </button>
-          <button 
-            onClick={stopConversation}
-            disabled={conversation.status !== 'connected'}
-            className="brutalist-btn bg-white text-black"
-          >
-            Stop Conversation
-          </button>
-        </div>
-        
-        <div className="mb-4">
-          <p>Status: <span className={conversation.status === 'connected' ? "text-green-600" : "text-red-600"}>
-            {conversation.status === 'connected' ? "Active" : "Inactive"}
-          </span></p>
-          <p>Agent is {conversation.isSpeaking ? 'speaking' : 'listening'}</p>
-        </div>
-        
-        <div className="text-sm text-gray-500 mt-4">
-          Current ethical score: {ethicalScore}, Weather: {weatherState}
-        </div>
+      <div 
+        ref={containerRef}
+        className="p-4 bg-gray-100 min-h-[400px] flex flex-col items-center justify-center"
+      >
+        {/* The elevenlabs-convai element will be injected here */}
       </div>
     </div>
   );
