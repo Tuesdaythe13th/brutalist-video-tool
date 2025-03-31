@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
-import { Conversation } from '@11labs/client';
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 interface ElevenLabsWidgetProps {
@@ -12,76 +11,50 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
   ethicalScore, 
   weatherState 
 }) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [agentMode, setAgentMode] = useState<string>("listening");
-  const conversationRef = useRef<any>(null);
+  const [isWidgetVisible, setIsWidgetVisible] = useState(false);
   
   // API key directly included for sandbox environment
   const API_KEY = "sk_341c45c68a487824abf467168934962e0e301f3a0e303cc0";
   const AGENT_ID = "5xmHawj3HdrruGcviH3Y";
   
-  const startConversation = async () => {
-    try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Start the conversation
-      conversationRef.current = await Conversation.startSession({
+  const showWidget = () => {
+    setIsWidgetVisible(true);
+  };
+  
+  const hideWidget = () => {
+    setIsWidgetVisible(false);
+  };
+  
+  useEffect(() => {
+    // Initialize widget if window.ElevenLabsWidget exists and widget is visible
+    if (isWidgetVisible && window.ElevenLabsWidget) {
+      window.ElevenLabsWidget.init({
+        apiKey: API_KEY,
         agentId: AGENT_ID,
         dynamicVariables: {
           ethical_score: ethicalScore.toString(),
           weather_state: weatherState
-        },
-        onConnect: () => {
-          setIsConnected(true);
-          console.log("Connected to ElevenLabs agent");
-        },
-        onDisconnect: () => {
-          setIsConnected(false);
-          console.log("Disconnected from ElevenLabs agent");
-        },
-        onError: (error) => {
-          console.error("ElevenLabs conversation error:", error);
-        },
-        onModeChange: (mode) => {
-          setAgentMode(mode.mode);
-          console.log("Agent mode changed to:", mode.mode);
-        },
+        }
       });
-    } catch (error) {
-      console.error("Failed to start ElevenLabs conversation:", error);
     }
-  };
-
-  const stopConversation = async () => {
-    if (conversationRef.current) {
-      await conversationRef.current.endSession();
-      conversationRef.current = null;
-      console.log("Conversation ended");
-    }
-  };
-
+    
+    // Cleanup function
+    return () => {
+      if (window.ElevenLabsWidget) {
+        window.ElevenLabsWidget.destroy();
+      }
+    };
+  }, [isWidgetVisible, ethicalScore, weatherState]);
+  
   // Update dynamic variables when props change
   useEffect(() => {
-    if (conversationRef.current && isConnected) {
-      console.log("Updating dynamic variables:", { 
-        ethical_score: ethicalScore.toString(), 
-        weather_state: weatherState 
-      });
-      
-      conversationRef.current.updateDynamicVariables({
+    if (isWidgetVisible && window.ElevenLabsWidget) {
+      window.ElevenLabsWidget.updateDynamicVariables({
         ethical_score: ethicalScore.toString(),
         weather_state: weatherState
       });
     }
-  }, [ethicalScore, weatherState, isConnected]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      stopConversation();
-    };
-  }, []);
+  }, [ethicalScore, weatherState, isWidgetVisible]);
   
   return (
     <div className="brutalist-card elevenlabs-widget-container mb-6">
@@ -95,15 +68,15 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       <div className="p-4 bg-gray-100 min-h-[400px] flex flex-col items-center justify-center">
         <div className="mb-4 space-x-4">
           <Button 
-            onClick={startConversation}
-            disabled={isConnected}
+            onClick={showWidget}
+            disabled={isWidgetVisible}
             variant="default"
           >
             Start Conversation
           </Button>
           <Button 
-            onClick={stopConversation}
-            disabled={!isConnected}
+            onClick={hideWidget}
+            disabled={!isWidgetVisible}
             variant="destructive"
           >
             Stop Conversation
@@ -111,18 +84,23 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         </div>
         
         <div className="mb-4">
-          <p>Status: <span className={isConnected ? "text-green-600" : "text-red-600"}>
-            {isConnected ? "Connected" : "Disconnected"}
+          <p>Status: <span className={isWidgetVisible ? "text-green-600" : "text-red-600"}>
+            {isWidgetVisible ? "Active" : "Inactive"}
           </span></p>
-          <p>Agent is <span className="font-medium">{agentMode}</span></p>
         </div>
         
-        {!isConnected && (
+        {!isWidgetVisible && (
           <div className="text-center mt-4">
             <p>Click "Start Conversation" to activate Luigi Digital Twin</p>
             <p className="text-sm text-gray-500 mt-2">
               Current ethical score: {ethicalScore}, Weather: {weatherState}
             </p>
+          </div>
+        )}
+        
+        {isWidgetVisible && (
+          <div id="elevenlabs-widget-container" className="w-full h-64">
+            {/* The ElevenLabs widget will be mounted here */}
           </div>
         )}
       </div>
