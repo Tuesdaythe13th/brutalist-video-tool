@@ -1,37 +1,53 @@
 
-import React, { useState, useEffect, useRef } from "react";
-import { Conversation } from '@11labs/client';
+import React, { useState } from "react";
+import { useConversation } from '@11labs/react';
 import { toast } from "@/components/ui/use-toast";
 
 export const ElevenLabsWidget: React.FC = () => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [agentMode, setAgentMode] = useState<string>("listening");
   const [isLoading, setIsLoading] = useState(false);
-  const conversationRef = useRef<any>(null);
   
   // Use a constant for the agent ID
   const AGENT_ID = "5xmHawj3HdrruGcviH3Y";
   
-  const startConversation = async () => {
+  // Initialize the conversation hook from @11labs/react
+  const conversation = useConversation({
+    onConnect: () => {
+      console.log("Connected to ElevenLabs agent");
+      toast({
+        title: "Connected",
+        description: "Successfully connected to the ElevenLabs agent",
+      });
+    },
+    onDisconnect: () => {
+      console.log("Disconnected from ElevenLabs agent");
+      toast({
+        title: "Disconnected",
+        description: "Disconnected from the ElevenLabs agent",
+        variant: "destructive"
+      });
+    },
+    onError: (error) => {
+      console.error("ElevenLabs conversation error:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred with the ElevenLabs conversation",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+    }
+  });
+
+  // Helper function to get signed URL from our Next.js API
+  const getSignedUrl = async () => {
     try {
-      setIsLoading(true);
+      console.log(`Fetching signed URL from API for agent: ${AGENT_ID}`);
       
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Get the URL for YOUR backend API route from environment variables
-      // For development purposes, we'll use a fallback URL if not set
-      const yourBackendApiUrl = import.meta.env.VITE_SIGNED_URL_ENDPOINT || "/api/get-signed-url";
-      
-      console.log(`Fetching signed URL from backend: ${yourBackendApiUrl} for agent: ${AGENT_ID}`);
-      
-      // Call YOUR backend API route (hosted on Vercel)
-      const response = await fetch(yourBackendApiUrl, {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ agentId: AGENT_ID })
+      const response = await fetch('/api/get-signed-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ agentId: AGENT_ID })
       });
 
       if (!response.ok) {
@@ -47,82 +63,59 @@ export const ElevenLabsWidget: React.FC = () => {
       }
 
       console.log("Successfully received signed URL");
+      return signedUrl;
+    } catch (error) {
+      console.error("Error fetching signed URL:", error);
+      throw error;
+    }
+  };
+  
+  const startConversation = async () => {
+    try {
+      setIsLoading(true);
       
-      // Start the conversation using the signed URL
-      // Instead of using url or signedUrl property, let's check the library documentation
-      // Based on @11labs/client examples, the connection URL should be passed directly
-      conversationRef.current = await Conversation.startSession({
-        url: signedUrl,
-        onConnect: () => {
-          setIsConnected(true);
-          setIsLoading(false);
-          console.log("Connected to ElevenLabs agent");
-          toast({
-            title: "Connected",
-            description: "Successfully connected to the ElevenLabs agent",
-          });
-        },
-        onDisconnect: () => {
-          setIsConnected(false);
-          console.log("Disconnected from ElevenLabs agent");
-          toast({
-            title: "Disconnected",
-            description: "Disconnected from the ElevenLabs agent",
-            variant: "destructive"
-          });
-        },
-        onError: (error) => {
-          console.error("ElevenLabs conversation error:", error);
-          setIsLoading(false);
-          toast({
-            title: "Error",
-            description: "An error occurred with the ElevenLabs conversation",
-            variant: "destructive"
-          });
-        },
-        onModeChange: (mode) => {
-          setAgentMode(mode.mode);
-          console.log("Agent mode changed to:", mode.mode);
-        },
+      // Request microphone permission
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Get signed URL from API
+      const signedUrl = await getSignedUrl();
+      
+      // Start the conversation using the hook's startSession method
+      await conversation.startSession({ 
+        url: signedUrl
       });
+      
     } catch (error) {
       console.error("Failed to start ElevenLabs conversation:", error);
-      setIsLoading(false);
       toast({
         title: "Connection Failed",
         description: "Could not connect to ElevenLabs. Please try again later.",
         variant: "destructive"
       });
+      setIsLoading(false);
     }
   };
 
   const stopConversation = async () => {
-    if (conversationRef.current) {
-      try {
-        await conversationRef.current.endSession();
-        conversationRef.current = null;
-        console.log("Conversation ended");
-        toast({
-          title: "Conversation Ended",
-          description: "The conversation has been ended successfully",
-        });
-      } catch (error) {
-        console.error("Error ending conversation:", error);
-        toast({
-          title: "Error",
-          description: "Failed to end the conversation properly",
-          variant: "destructive"
-        });
-      }
+    try {
+      await conversation.endSession();
+      console.log("Conversation ended");
+      toast({
+        title: "Conversation Ended",
+        description: "The conversation has been ended successfully",
+      });
+    } catch (error) {
+      console.error("Error ending conversation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end the conversation properly",
+        variant: "destructive"
+      });
     }
   };
 
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      stopConversation();
-    };
-  }, []);
+  // Determine if the conversation is connected
+  const isConnected = conversation.status === "connected";
   
   return (
     <div className="brutalist-card elevenlabs-widget-container mb-6">
@@ -155,7 +148,7 @@ export const ElevenLabsWidget: React.FC = () => {
           <p>Status: <span className={isConnected ? "text-green-600" : "text-red-600"}>
             {isConnected ? "Connected" : "Disconnected"}
           </span></p>
-          {isConnected && <p>Agent is <span className="font-medium">{agentMode}</span></p>}
+          {isConnected && <p>Agent is <span className="font-medium">{conversation.isSpeaking ? "speaking" : "listening"}</span></p>}
         </div>
         
         {!isConnected && !isLoading && (
