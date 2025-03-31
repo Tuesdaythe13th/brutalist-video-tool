@@ -1,15 +1,7 @@
 
 import React, { useEffect, useRef } from "react";
 
-interface ElevenLabsWidgetProps {
-  ethicalScore: number;
-  weatherState: string;
-}
-
-export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({ 
-  ethicalScore, 
-  weatherState 
-}) => {
+export const ElevenLabsWidget: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,10 +17,6 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
       // Create the elevenlabs-convai element
       const widget = document.createElement('elevenlabs-convai');
       widget.setAttribute('agent-id', '5xmHawj3HdrruGcviH3Y');
-      widget.setAttribute('dynamic-variables', JSON.stringify({
-        ethical_score: ethicalScore.toString(),
-        weather_state: weatherState
-      }));
       
       // Clear container and append the widget
       containerRef.current.innerHTML = '';
@@ -42,7 +30,7 @@ export const ElevenLabsWidget: React.FC<ElevenLabsWidgetProps> = ({
         document.body.removeChild(existingScript);
       }
     };
-  }, [ethicalScore, weatherState]);
+  }, []);
 
   return (
     <div className="brutalist-card elevenlabs-widget-container mb-6">

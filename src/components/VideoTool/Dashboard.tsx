@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
@@ -108,11 +107,8 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="brutalist-container">
-      {/* ElevenLabs Widget Component */}
-      <ElevenLabsWidget 
-        ethicalScore={ethicalScore} 
-        weatherState={weatherState} 
-      />
+      {/* ElevenLabs Widget Component - now without parameters */}
+      <ElevenLabsWidget />
       
       <header className="mb-8">
         <h1 className="brutalist-header">LLM EVALUATION DASHBOARD</h1>
